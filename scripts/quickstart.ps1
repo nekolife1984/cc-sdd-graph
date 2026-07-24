@@ -84,9 +84,18 @@ $langFlag = if ($langChoice -eq "2") { "--lang ja" } else { "" }
 $crgPlatform = $crgPlatformMap[$agentChoice]
 $prefix = $prefixMap[$agentChoice]
 
+# Kiro directory prompt
+$kiroFlag = ""
+Write-Host ""
+Write-Host "  Kiro directory (where specs and settings are stored):"
+$kiroInput = Read-Host "  Path (Enter=.kiro)"
+if (-not [string]::IsNullOrEmpty($kiroInput)) {
+    $kiroFlag = "--kiro-dir $kiroInput"
+}
+
 try {
-    Write-Info "Running: npx github:$GITHUB_REPO $agentFlag $langFlag"
-    npx "github:$GITHUB_REPO" $agentFlag $langFlag
+    Write-Info "Running: npx github:$GITHUB_REPO $agentFlag $langFlag $kiroFlag"
+    npx "github:$GITHUB_REPO" $agentFlag $langFlag $kiroFlag
 } catch {
     Write-Warn "npx github: failed. Falling back to git clone..."
     $tmpDir = "$env:TEMP\cc-sdd-graph-$(Get-Random)"

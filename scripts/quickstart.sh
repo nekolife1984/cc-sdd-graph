@@ -113,8 +113,17 @@ case "${LANG_CHOICE:-1}" in
 esac
 
 echo ""
-info "Running: npx github:$GITHUB_REPO $AGENT_FLAG $LANG_FLAG"
-npx "github:$GITHUB_REPO" $AGENT_FLAG $LANG_FLAG
+echo "  Kiro directory (where specs and settings are stored):"
+echo -n "  Path (Enter=.kiro): "
+read -r KIRO_DIR_INPUT
+KIRO_FLAG=""
+if [ -n "$KIRO_DIR_INPUT" ]; then
+  KIRO_FLAG="--kiro-dir $KIRO_DIR_INPUT"
+fi
+
+echo ""
+info "Running: npx github:$GITHUB_REPO $AGENT_FLAG $LANG_FLAG $KIRO_FLAG"
+npx "github:$GITHUB_REPO" $AGENT_FLAG $LANG_FLAG $KIRO_FLAG
 ok "cc-sdd-graph installation complete"
 
 # ── Step 2: CRG Setup ──────────────────────────────────
