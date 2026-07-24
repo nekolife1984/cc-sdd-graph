@@ -94,9 +94,9 @@ When modifying existing systems:
 
 > Keep rationale concise here and, when more depth is required (trade-offs, benchmarks), add a short summary plus pointer to the Supporting References section and `research.md` for raw investigation notes.
 
-## File Structure Plan
+## ファイル構成計画
 
-Map the directory structure and file responsibilities for this feature. This section directly drives task `_Boundary:_` annotations and implementation Task Briefs. Use the appropriate level of detail:
+このセクションは、タスクの `_Boundary:_` アノテーションと実装タスクブリーフに直接影響します。また、`.trace-mapping.yaml` の `code.files` フィールドの基盤としても使用されます。適切な詳細度を使用:
 
 - **Small features**: List individual files with responsibilities
 - **Large features**: Describe directory-level structure + per-domain/module pattern, list only non-obvious files individually

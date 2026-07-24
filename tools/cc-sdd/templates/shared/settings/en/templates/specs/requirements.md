@@ -14,6 +14,7 @@
 ### Requirement 1: {{REQUIREMENT_AREA_1}}
 <!-- Requirement headings MUST include a leading numeric ID only (for example: "Requirement 1: ...", "1. Overview", "2 Feature: ..."). Alphabetic IDs like "Requirement A" are not allowed. -->
 **Objective:** As a {{ROLE}}, I want {{CAPABILITY}}, so that {{BENEFIT}}
+<!-- IMPORTANT: This numeric ID (1, 2, 3...) is used in @impl tags (e.g., # @impl 1.1) and .trace-mapping.yaml id fields. Do not change. -->
 
 #### Acceptance Criteria
 1. When [event], the [system] shall [response/action]
@@ -24,6 +25,7 @@
 
 ### Requirement 2: {{REQUIREMENT_AREA_2}}
 **Objective:** As a {{ROLE}}, I want {{CAPABILITY}}, so that {{BENEFIT}}
+<!-- IMPORTANT: This numeric ID (1, 2, 3...) is used in @impl tags (e.g., # @impl 1.1) and .trace-mapping.yaml id fields. Do not change. -->
 
 #### Acceptance Criteria
 1. When [event], the [system] shall [response/action]

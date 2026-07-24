@@ -95,7 +95,7 @@ When modifying existing systems:
 
 ## File Structure Plan
 
-Map the directory structure and file responsibilities for this feature. This section directly drives task `_Boundary:_` annotations and implementation Task Briefs. Use the appropriate level of detail:
+Map the directory structure and file responsibilities for this feature. This section directly drives task `_Boundary:_` annotations and implementation Task Briefs. It also feeds into `.trace-mapping.yaml`'s `code.files` field. Use the appropriate level of detail:
 
 - **Small features**: List individual files with responsibilities
 - **Large features**: Describe directory-level structure + per-domain/module pattern, list only non-obvious files individually

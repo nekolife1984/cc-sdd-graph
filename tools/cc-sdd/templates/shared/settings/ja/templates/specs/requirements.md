@@ -14,6 +14,7 @@
 ### 要件 1: {{REQUIREMENT_AREA_1}}
 <!-- 要件の見出しには数値IDのみを含めること（例: "要件 1: ..."）。アルファベッドのID（"要件 A"等）は禁止。 -->
 **目的:** {{ROLE}}として、{{CAPABILITY}}したい、それにより{{BENEFIT}}
+<!-- IMPORTANT: この数値ID（1, 2, 3...）は、コード内の @impl タグ（例: # @impl 1.1）や .trace-mapping.yaml の id フィールドとして使用されます。変更しないでください -->
 
 #### 受け入れ基準
 1. When [イベント], the [システム] shall [応答/動作]
@@ -24,6 +25,7 @@
 
 ### 要件 2: {{REQUIREMENT_AREA_2}}
 **目的:** {{ROLE}}として、{{CAPABILITY}}したい、それにより{{BENEFIT}}
+<!-- IMPORTANT: この数値ID（1, 2, 3...）は、コード内の @impl タグ（例: # @impl 1.1）や .trace-mapping.yaml の id フィールドとして使用されます。変更しないでください -->
 
 #### 受け入れ基準
 1. When [イベント], the [システム] shall [応答/動作]
