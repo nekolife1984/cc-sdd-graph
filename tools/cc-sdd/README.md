@@ -40,17 +40,32 @@ Full rationale, trade-offs, and when-to-use / when-not-to-use: [Why cc-sdd? A ph
 
 ```bash
 cd your-project
-npx cc-sdd@latest
+npx cc-sdd-graph@latest
 ```
 
 The default installs **Claude Code Skills** with English docs. To pick another agent or language:
 
 ```bash
-npx cc-sdd@latest --codex-skills --lang ja      # Codex, Japanese
-npx cc-sdd@latest --cursor-skills --lang zh-TW  # Cursor IDE, Traditional Chinese
+npx cc-sdd-graph@latest --codex-skills --lang ja      # Codex, Japanese
+npx cc-sdd-graph@latest --cursor-skills --lang zh-TW  # Cursor IDE, Traditional Chinese
 ```
 
 Supports 8 AI coding agents (Claude Code and Codex stable; Cursor, Copilot, Windsurf, OpenCode, Gemini CLI, and Antigravity in beta) and 13 languages. See [Supported Agents](#supported-agents) for the full list.
+
+### Optional: CRG Traceability Setup
+
+After installation, optionally install **code-review-graph** for code-graph-aware spec→code impact analysis:
+
+```bash
+bash .agents/scripts/setup-crg.sh
+```
+
+This enables:
+- `/kiro-trace <spec-id>` — trace spec changes to code impact
+- `/kiro-impact <file>` — trace code changes back to affected specs
+- `/kiro-validate-boundary` — mechanically verify `_Boundary:_` against code graph
+
+See [Setup Guide](./.agents/scripts/README.md) for more options including `--yes` and `--platform` flags.
 
 Then, in your agent:
 

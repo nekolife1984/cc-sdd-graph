@@ -1,7 +1,7 @@
 {
-  "name": "cc-sdd",
+  "name": "cc-sdd-graph",
   "version": "3.0.2",
-  "description": "Turn approved specs into long-running autonomous implementation. A minimal, adaptable SDD harness with Agent Skills for Claude Code, Codex, Cursor, Copilot, Windsurf, OpenCode, Gemini CLI, and Antigravity.",
+  "description": "Turn approved specs into long-running autonomous implementation with code-review-graph traceability. A minimal, adaptable SDD harness with Agent Skills for Claude Code, Codex, Cursor, Copilot, Windsurf, OpenCode, Gemini CLI, and Antigravity.",
   "keywords": [
     "claude-code",
     "cursor",
@@ -9,7 +9,6 @@
     "gemini-cli",
     "codex",
     "github-copilot",
-    "qwen-code",
     "opencode",
     "sdd",
     "spec-driven-development",
@@ -20,18 +19,20 @@
     "ai-dlc",
     "agentic-sdlc",
     "subagents",
-    "parallel-tasks"
+    "parallel-tasks",
+    "code-review-graph",
+    "traceability"
   ],
-  "author": "Gota",
+  "author": "Gota, nekolife1984",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gotalab/cc-sdd.git",
+    "url": "https://github.com/nekolife1984/cc-sdd-graph.git",
     "directory": "tools/cc-sdd"
   },
   "type": "module",
   "bin": {
-    "cc-sdd": "./dist/cli.js"
+    "cc-sdd-graph": "./dist/cli.js"
   },
   "scripts": {
     "test": "vitest run",

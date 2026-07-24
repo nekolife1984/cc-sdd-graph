@@ -24,7 +24,7 @@ const aliasFlags = Array.from(new Set(agentKeys.flatMap((key) => getAgentDefinit
 
 const agentAliasLine = aliasFlags.length > 0 ? `  ${aliasFlags.join(' | ')}  Agent alias flags\n` : '';
 
-const helpText = `Usage: cc-sdd [options]
+const helpText = `Usage: cc-sdd-graph [options]
 
 Options:
   --agent <${agentKeys.join('|')}>  Select agent
