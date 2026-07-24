@@ -42,6 +42,9 @@ Checks:
   P1 false-green ベクターチェック:
   13. cross-lang — 言語間の @impl タグ一貫性
   14. snapshot   — コード変更後のスナップショット更新確認
+  P2 false-green ベクターチェック:
+  15. descriptions — .trace-mapping.yaml の description 未設定
+  16. satisfies   — design.md の @satisfies 未マッピング
 """
 
 import argparse
@@ -1126,6 +1129,57 @@ def check_snapshot_freshness(project_dir: Path, mappings: list[dict]) -> list[st
     return issues
 
 
+def check_mapping_descriptions(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    P2-1: .trace-mapping.yaml の全エントリに description があるか
+    """
+    issues = []
+    if not mappings:
+        return []
+    for m in mappings:
+        mid = m.get("id", "")
+        desc = m.get("description", "").strip()
+        if not desc:
+            issues.append(
+                f"[descriptions] id={mid}: description が未設定です"
+            )
+    return issues
+
+
+def check_satisfies_mapped(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    P2-2: design.md の @satisfies が .trace-mapping.yaml に存在するか
+    """
+    issues = []
+    if not mappings:
+        return []
+
+    mapped_ids = {m.get("id", "") for m in mappings if m.get("id")}
+    SATISFIES_TAG_RE = re.compile(
+        r'<!--\s*@satisfies\s+(.+?)\s*-->', re.MULTILINE
+    )
+
+    spec_dir = project_dir / ".kiro" / "specs"
+    if not spec_dir.exists():
+        return []
+
+    for design_file in sorted(spec_dir.rglob("design.md")):
+        try:
+            content = design_file.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for match in SATISFIES_TAG_RE.finditer(content):
+            ids_str = match.group(1).strip()
+            for req_id in [i.strip() for i in ids_str.replace("，", ",").split(",") if i.strip()]:
+                if req_id not in mapped_ids:
+                    rel = design_file.relative_to(project_dir)
+                    issues.append(
+                        f"[satisfies] {rel}: @satisfies {req_id} が "
+                        f".trace-mapping.yaml に対応するエントリなし"
+                    )
+    return issues
+
+
 AVAILABLE_CHECKS = {
     "impl": check_impl_completeness,
     "files": check_files_existence,
@@ -1143,6 +1197,9 @@ AVAILABLE_CHECKS = {
     # P1 false-green ベクターチェック
     "cross-lang": check_cross_language_tags,
     "snapshot": check_snapshot_freshness,
+    # P2 false-green ベクターチェック
+    "descriptions": check_mapping_descriptions,
+    "satisfies": check_satisfies_mapped,
 }
 
 
