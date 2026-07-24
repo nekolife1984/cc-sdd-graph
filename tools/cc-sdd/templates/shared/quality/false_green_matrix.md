@@ -8,10 +8,10 @@ cc-sdd-graph の検証器（verifier）強靭化状況を示すマトリクス�
 
 | Vector | Pri | Owner Gate | Status | Detection | Check CLI |
 |--------|:---:|:----------:|:------:|:---------:|-----------|
-| impl_tag_orphan | P0 | No | **shipped** | **caught_amber** | `--check coverage` |
-| verifies_empty_assert | P0 | No | **shipped** | **caught_amber** | `--check assertions` |
-| mapping_stale | P0 | No | **shipped** | **caught_amber** | `--check stale` |
-| ci_gate_bypassed | P0 | Yes | planned | missed_green | (外部監視) |
+| impl_tag_orphan | P0 | No | shipped | caught_amber | `--check coverage` |
+| verifies_empty_assert | P0 | No | shipped | caught_amber | `--check assertions` |
+| mapping_stale | P0 | No | shipped | caught_amber | `--check stale` |
+| ci_gate_bypassed | P0 | Yes | **shipped** | **caught_amber** | `check-ci-bypass.py` |
 | spec_no_test_coverage | P1 | No | planned | missed_green | `--coverage` |
 | snapshot_missing_update | P1 | No | planned | missed_green | pre-commit skip 検知 |
 | cross_language_tag_mismatch | P1 | No | planned | missed_green | `--cross-ref` |
@@ -20,15 +20,15 @@ cc-sdd-graph の検証器（verifier）強靭化状況を示すマトリクス�
 
 ## 充足条件（Saturation）
 
-全ての P0/P1 non-owner-gated ベクターが以下を満たしたとき saturation と判定:
+全 P0 ベクターが出荷済み。P1 以降の saturation を目指す:
 
 | 条件 | 状態 |
 |------|:----:|
 | 4-fixture 完備 | 🟡 ガイド作成済み（`quality/4-fixtures-guide.md`） |
-| P0 kill rate 100%（caught_red または caught_amber） | 🟡 **3/4 shipped**（coverage, assertions, stale） |
+| **P0 kill rate 100%** | 🟢 **4/4 shipped**（coverage, assertions, stale, ci_bypass） |
 | P1 kill rate ≥95% | 🔴 未着手 |
 | control/legacy false-red = 0 | 🟡 未検証 |
-| 連続2回の discovery で新規 missed_green なし | 🔴 未着手 |
+| 連続2回の discovery で新規 missed_green なし | 🟡 初回 discovery 未実施 |
 
 ## 測定コマンド
 

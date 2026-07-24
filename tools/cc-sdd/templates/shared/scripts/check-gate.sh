@@ -60,6 +60,17 @@ run_p0_check "assertions" "P0-2: @verifies empty assertion"
 run_p0_check "stale"      "P0-3: stale mapping entry"
 
 echo ""
+info "P0-4: CI gate bypass..."
+if python3 .agents/scripts/check-ci-bypass.py 2>&1; then
+    ok "P0-4: PASS"
+    CHECK_RESULTS["ci_bypass"]="caught_amber"
+else
+    warn "P0-4: ISSUES FOUND"
+    CHECK_RESULTS["ci_bypass"]="missed_green"
+    ALL_PASSED=false
+fi
+
+echo ""
 
 # ── Matrix 更新 ──
 if [ ! -f "$MATRIX_FILE" ]; then

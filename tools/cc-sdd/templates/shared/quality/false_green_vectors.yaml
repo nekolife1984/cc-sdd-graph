@@ -128,11 +128,14 @@ vectors:
     severity: amber
     owner_gate: true  # 判断に人間が必要（緊急 bypass は正当）
     false_red_risk: 5
-    status: planned
-    detection: missed_green
-    check_framework: github_actions
-    check: GitHub Actions workflow_run 履歴のチェック
-    cli: (外部監視ツール)
+    status: shipped
+    detection: caught_amber
+    check_framework: git + github_actions
+    check: |
+      1. .git/hooks/pre-push の存在と内容
+      2. git log --grep=SKIP_TRACE
+      3. gh run list --workflow=traceability-check.yml
+    cli: check-ci-bypass.py
 
   # ═══════════════════════════════════════════════════════════════
   # P1 — Important: should detect for quality

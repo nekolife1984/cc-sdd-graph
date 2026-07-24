@@ -231,6 +231,43 @@ bash .agents/scripts/check-gate.sh
 | `assertions` | P0-2 空アサーション | @verifies ファイルに assert/expect/should があるか | なし（静的解析） |
 | `stale` | P0-3 stale mapping | 参照コードが90日以上未変更か | git 管理下であること |
 
+### P0-4: CI ゲートバイパス検知（出荷済み）
+
+`check-ci-bypass.py` が CI ゲートのバイパスを検出する:
+
+```bash
+# 基本チェック
+python3 .agents/scripts/check-ci-bypass.py
+
+# 詳細表示
+python3 .agents/scripts/check-ci-bypass.py --verbose
+
+# 確認期間を30日に延ばす
+CI_BYPASS_LOOKBACK=30 python3 .agents/scripts/check-ci-bypass.py
+
+# bypass を許可する（エラーにしない）
+SKIP_TRACE_ALLOWED=1 python3 .agents/scripts/check-ci-bypass.py
+```
+
+チェック内容:
+
+| # | チェック | 検出するもの | 備考 |
+|:-:|---------|-------------|------|
+| 1 | pre-push hook | hook が未設置 / 権限なし / 別の hook で上書き | 常に実行 |
+| 2 | git log | 直近のコミットでの `SKIP_TRACE` 使用 | デフォルト14日間 |
+| 3 | GitHub Actions | CI の失敗・スキップ履歴 | `gh` CLI が必要（opt-in） |
+
+cron 定期実行との組み合わせ:
+
+```yaml
+# .github/workflows/daily-bypass-check.yml または Hermes cron
+action: create
+schedule: 0 6 * * *
+name: daily-ci-bypass-check
+prompt: .agents/scripts/check-ci-bypass.py --verbose を実行し、結果を報告してください
+skills: [spec-traceability, ci-gate-monitor]
+```
+
 ## よくある使い方
 
 ```bash
