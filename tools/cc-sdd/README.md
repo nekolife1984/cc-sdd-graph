@@ -64,6 +64,8 @@ This enables:
 - `/kiro-trace <spec-id>` — trace spec changes to code impact
 - `/kiro-impact <file>` — trace code changes back to affected specs
 - `/kiro-validate-boundary` — mechanically verify `_Boundary:_` against code graph
+- CRG-enhanced design review, gap analysis, completion verification, and more (15 skills total)
+- Pre-commit hook for automatic snapshot updates on every commit
 
 See [Setup Guide](./.agents/scripts/README.md) for more options including `--yes` and `--platform` flags.
 

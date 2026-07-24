@@ -50,7 +50,24 @@ npx github:nekolife1984/cc-sdd-graph --codex-skills --lang ja      # Codex、日
 npx github:nekolife1984/cc-sdd-graph --cursor-skills --lang zh-TW  # Cursor IDE、繁体字中国語
 ```
 
-8 つの AI coding agent（Claude Code と Codex は stable、Cursor, Copilot, Windsurf, OpenCode, Gemini CLI, Antigravity は beta）と 13 言語に対応。全リストは [対応エージェント](#対応エージェント) を参照。
+8種類のAIコーディングエージェントに対応（Claude CodeとCodexが安定版、Cursor、Copilot、Windsurf、OpenCode、Gemini CLI、Antigravityがベータ版）、13言語対応。[対応エージェント一覧](#対応エージェント)を参照。
+
+### オプション: CRG トレーサビリティセットアップ
+
+インストール後、**code-review-graph** を導入するとコードグラフを活用した仕様↔コード影響分析が可能になります:
+
+```bash
+bash .agents/scripts/setup-crg.sh
+```
+
+これにより以下が有効になります:
+- `/kiro-trace <spec-id>` — 仕様変更がコードに与える影響をトレース
+- `/kiro-impact <file>` — コード変更が仕様に与える影響をトレース
+- `/kiro-validate-boundary` — `_Boundary:_` とコードグラフを機械検証
+- CRG 強化された設計レビュー、ギャップ分析、完了検証など（全15スキル）
+- pre-commit hook によるコミット時の自動スナップショット更新
+
+詳細は[セットアップガイド](./.agents/scripts/README.md)を参照。
 
 その後、エージェント上で:
 
