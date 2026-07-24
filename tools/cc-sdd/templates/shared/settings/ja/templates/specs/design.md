@@ -29,304 +29,301 @@
 - 明示的に除外する機能
 - 現在のスコープ外の将来検討事項
 - 先送りする統合ポイント
-- Future considerations outside current scope
-- Integration points deferred
 
-## Boundary Commitments
+## 境界の責務（Boundary Commitments）
 
-State the responsibility boundary of this spec in concrete terms. Treat this as the anchor for architecture, tasks, and later validation.
+このスペックの責務範囲を具体的に記述する。アーキテクチャ、タスク、後の検証のアンカーとして扱うこと。
 
-### This Spec Owns
-- Capabilities and behaviors this spec is responsible for
-- Data it owns or is authoritative for
-- Interfaces or contracts it defines or stabilizes
+### 本スペックの責務
+- 本スペックが責務を持つ機能・振る舞い
+- 所有または権威を持つデータ
+- 定義または安定化するインターフェース・コントラクト
 
-### Out of Boundary
-- Related concerns this spec explicitly does NOT own
-- Work deferred to another spec, existing subsystem, or later phase
-- Changes this spec must not absorb as "just one more thing"
+### 範囲外
+- 本スペックが明示的に所有しない関連 concern
+- 他のスペック・既存サブシステム・後続フェーズに先送りする作業
+- 「ついでに」吸収してはならない変更
 
-### Allowed Dependencies
-- Upstream systems/specs/components this design may depend on
-- Shared infrastructure this design may use
-- Dependency constraints that must not be violated
+### 許容される依存関係
+- 本設計が依存してよい上流システム・スペック・コンポーネント
+- 本設計が利用してよい共有インフラ
+- 違反してはならない依存制約
 
-### Revalidation Triggers
-List the kinds of changes that should force dependent specs or consumers to re-check integration.
+### 再検証トリガー
+依存スペックやコンシューマーに統合の再確認を強制すべき変更の種類を列挙する。
 
-- Contract shape changes
-- Data ownership changes
-- Dependency direction changes
-- Startup/runtime prerequisite changes
+- コントラクト形状の変更
+- データ所有権の変更
+- 依存方向の変更
+- 起動時/実行時前提条件の変更
 
-## Architecture
+## アーキテクチャ
 
-> Reference detailed discovery notes in `research.md` only for background; keep design.md self-contained for reviewers by capturing all decisions and contracts here.
-> Capture key decisions in text and let diagrams carry structural detail—avoid repeating the same information in prose.
-> Supporting sections below should remain as light as possible unless they materially clarify the responsibility boundary, dependency rules, or integration seams.
+> 詳細な調査ノートは `research.md` を参照すること。ただし設計書自体は自己完結させ、すべての決定事項とコントラクトをここに記載すること。
+> 重要な決定は文章で、構造の詳細は図で表現し、同じ情報を重複して記述しないこと。
+> 以下のサポートセクションは、責務境界・依存ルール・結合 seams を明確にする場合を除き、可能な限り軽量に保つこと。
 
-### Existing Architecture Analysis (if applicable)
-When modifying existing systems:
-- Current architecture patterns and constraints
-- Existing domain boundaries to be respected
-- Integration points that must be maintained
-- Technical debt addressed or worked around
+### 既存アーキテクチャの分析（該当する場合）
+既存システムを変更する場合:
+- 現在のアーキテクチャパターンと制約
+- 尊重すべき既存のドメイン境界
+- 維持すべき結合ポイント
+- 対応または回避する技術負債
 
-### Architecture Pattern & Boundary Map
-**RECOMMENDED**: Include Mermaid diagram showing the chosen architecture pattern and system boundaries (required for complex features, optional for simple additions)
+### アーキテクチャパターンと境界マップ
+**推奨**: 選択したアーキテクチャパターンとシステム境界を示す Mermaid 図を含める（複雑な機能では必須、シンプルな追加では任意）
 
-**Architecture Integration**:
-- Selected pattern: [name and brief rationale]
-- Domain/feature boundaries: [how responsibilities are separated to avoid conflicts]
-- Existing patterns preserved: [list key patterns]
-- New components rationale: [why each is needed]
-- Steering compliance: [principles maintained]
+**アーキテクチャ統合**:
+- 選択したパターン: [名称と簡単な理由]
+- ドメイン/機能境界: [責務の分離方法]
+- 維持する既存パターン: [主要パターンのリスト]
+- 新規コンポーネントの理由: [それぞれが必要な理由]
+- 設計原則準拠: [維持する原則]
 
-### Technology Stack
+### 技術スタック
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Frontend / CLI | | | |
-| Backend / Services | | | |
-| Data / Storage | | | |
-| Messaging / Events | | | |
-| Infrastructure / Runtime | | | |
+| レイヤ | 選択 / バージョン | 機能内での役割 | 備考 |
+|-------|------------------|----------------|------|
+| フロントエンド / CLI | | | |
+| バックエンド / サービス | | | |
+| データ / ストレージ | | | |
+| メッセージング / イベント | | | |
+| インフラ / ランタイム | | | |
 
-> Keep rationale concise here and, when more depth is required (trade-offs, benchmarks), add a short summary plus pointer to the Supporting References section and `research.md` for raw investigation notes.
+> ここでは簡潔に理由を記載し、より深い検討（トレードオフ、ベンチマーク）が必要な場合は、短いサマリーと Supporting References セクションおよび `research.md` へのポインタを追加すること。
 
 ## ファイル構成計画
 
-このセクションは、タスクの `_Boundary:_` アノテーションと実装タスクブリーフに直接影響します。また、`.trace-mapping.yaml` の `code.files` フィールドの基盤としても使用されます。適切な詳細度を使用:
+このセクションは、タスクの `_Boundary:_` アノテーションと実装タスクブリーフに直接影響する。また、`.trace-mapping.yaml` の `code.files` フィールドの基盤としても使用される。適切な詳細度を使用すること:
 
-- **Small features**: List individual files with responsibilities
-- **Large features**: Describe directory-level structure + per-domain/module pattern, list only non-obvious files individually
+- **小規模機能**: ファイル単位で責務を記載
+- **大規模機能**: ディレクトリ構造 + ドメイン/モジュールごとのパターンを記述し、自明でないファイルのみ個別に記載
 
-### Directory Structure
+### ディレクトリ構造
 ```
 src/
-├── domain-a/              # Domain A responsibility
-│   ├── controller.ts      # Endpoint handlers
-│   ├── service.ts         # Business logic
-│   └── types.ts           # Domain types
-├── domain-b/              # Domain B (same pattern as domain-a)
+├── domain-a/              # ドメインAの責務
+│   ├── controller.ts      # エンドポイントハンドラ
+│   ├── service.ts         # ビジネスロジック
+│   └── types.ts           # ドメイン型定義
+├── domain-b/              # ドメインB（domain-a と同パターン）
 └── shared/
-    └── cross-cutting.ts   # Non-obvious: why this exists
+    └── cross-cutting.ts   # 非自明: なぜ存在するか
 ```
 
-> For repeated structures, describe the pattern once (e.g., "domain-b follows same pattern as domain-a"). List individual files only when their responsibility isn't obvious from the path.
+> 繰り返し構造は一度だけパターンを説明すること（例: 「domain-b は domain-a と同パターン」）。パスから責務が自明でないファイルのみ個別に記載すること。
 
-### Modified Files
-- `path/to/existing.ts` — What changes and why
+### 変更対象ファイル
+- `path/to/existing.ts` — 変更内容と理由
 
-> Each file should have one clear responsibility. Group files that change together. For repeated structures, describe the pattern once rather than listing every file.
-> Avoid duplicating what Components and Interfaces already describes — focus on the physical file layout that Components maps to.
+> 各ファイルは1つの明確な責務を持つこと。一緒に変更されるファイルはグループ化すること。Components and Interfaces と重複しないこと — ここでは物理的なファイルレイアウトに焦点を当てる。
 
-## System Flows
+## システムフロー
 
-Provide only the diagrams needed to explain non-trivial flows. Use pure Mermaid syntax. Common patterns:
-- Sequence (multi-party interactions)
-- Process / state (branching logic or lifecycle)
-- Data / event flow (pipelines, async messaging)
+非自明なフローを説明するために必要な図のみを提供する。純粋な Mermaid 構文を使用すること。一般的なパターン:
+- シーケンス図（複数パーティ間の相互作用）
+- プロセス / 状態図（分岐ロジックやライフサイクル）
+- データ / イベントフロー図（パイプライン、非同期メッセージング）
 
-Skip this section entirely for simple CRUD changes.
-> Describe flow-level decisions (e.g., gating conditions, retries) briefly after the diagram instead of restating each step.
+単純な CRUD 変更ではこのセクションは完全に省略してよい。
+> 図の後にはフローレベルの決定事項（ゲーティング条件、リトライなど）を簡潔に記載し、各ステップを再述しないこと。
 
-## Requirements Traceability
+## 要件トレーサビリティ
 
-Use this section for complex or compliance-sensitive features where requirements span multiple domains. Straightforward 1:1 mappings can rely on the Components summary table.
+要件が複数ドメインにまたがる複雑な機能やコンプライアンスが重要な機能で使用する。単純な1:1マッピングの場合は Components サマリーテーブルで代替可能。
 
-Map each requirement ID (e.g., `2.1`) to the design elements that realize it.
+各要件 ID（例: `2.1`）を、それを実現する設計要素にマッピングする。
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
+| 要件 | サマリー | コンポーネント | インターフェース | フロー |
+|-----|---------|--------------|----------------|-------|
 | 1.1 | | | | |
 | 1.2 | | | | |
 
-> Omit this section only when a single component satisfies a single requirement without cross-cutting concerns.
+> 単一のコンポーネントが横断的 concern なしに単一の要件を満たす場合のみ、このセクションを省略してよい。
 
-## Components and Interfaces
+## コンポーネントとインターフェース
 
-Provide a quick reference before diving into per-component details.
+詳細に入る前にクイックリファレンスを提供する。
 
-- Summaries can be a table or compact list. Example table:
-  | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
-  |-----------|--------------|--------|--------------|--------------------------|-----------|
-  | ExampleComponent | UI | Displays XYZ | 1, 2 | GameProvider (P0), MapPanel (P1) | Service, State |
-- Only components introducing new boundaries (e.g., logic hooks, external integrations, persistence) require full detail blocks. Simple presentation components can rely on the summary row plus a short Implementation Note.
+- サマリーはテーブルまたはコンパクトなリストで記述可能。テーブル例:
+  | コンポーネント | ドメイン/レイヤ | 意図 | 対象要件 | 主要依存関係 (P0/P1) | コントラクト種別 |
+  |--------------|--------------|------|---------|--------------------|----------------|
+  | ExampleComponent | UI | XYZを表示 | 1, 2 | GameProvider (P0), MapPanel (P1) | Service, State |
+- 新しい境界を導入するコンポーネント（ロジックフック、外部統合、永続化など）のみ、詳細ブロックが必要。単純な表示コンポーネントはサマリー行＋簡単な実装メモで十分。
 
-Group detailed blocks by domain or architectural layer. For each detailed component, list requirement IDs as `2.1, 2.3` (omit “Requirement”). When multiple UI components share the same contract, reference a base interface/props definition instead of duplicating code blocks.
+詳細ブロックはドメインまたはアーキテクチャレイヤごとにグループ化する。各コンポーネントの要件 ID は `2.1, 2.3` のように記載する（「要件」の表記は省略）。複数の UI コンポーネントが同じコントラクトを共有する場合は、ベースのインターフェース・props 定義を参照させ、コードブロックを重複させないこと。
 
-### [Domain / Layer]
+### [ドメイン / レイヤ]
 
-#### [Component Name]
+#### [コンポーネント名]
 
-| Field | Detail |
-|-------|--------|
-| Intent | 1-line description of the responsibility |
-| Requirements | 2.1, 2.3 |
-| Owner / Reviewers | (optional) |
+| フィールド | 詳細 |
+|-----------|------|
+| 意図 | 責務の1行説明 |
+| 要件 | 2.1, 2.3 |
+| 所有者 / レビューア | （任意） |
 
-**Responsibilities & Constraints**
-- Primary responsibility
-- Domain boundary and transaction scope
-- Data ownership / invariants
+**責務と制約**
+- 主要責務
+- ドメイン境界とトランザクションスコープ
+- データ所有権 / 不変条件
 
-**Dependencies**
-- Inbound: Component/service name — purpose (Criticality)
-- Outbound: Component/service name — purpose (Criticality)
-- External: Service/library — purpose (Criticality)
+**依存関係**
+- 受信: コンポーネント/サービス名 — 目的（重要度）
+- 送信: コンポーネント/サービス名 — 目的（重要度）
+- 外部: サービス/ライブラリ — 目的（重要度）
 
-Summarize external dependency findings here; deeper investigation (API signatures, rate limits, migration notes) lives in `research.md`.
+外部依存関係の調査結果はここに要約し、詳細（API シグネチャ、レート制限、移行ノート）は `research.md` に記載すること。
 
-**Contracts**: Service [ ] / API [ ] / Event [ ] / Batch [ ] / State [ ]  ← check only the ones that apply.
+**コントラクト**: Service [ ] / API [ ] / Event [ ] / Batch [ ] / State [ ]  ← 該当するものにチェック
 
-##### Service Interface
+##### サービスインターフェース
 ```typescript
 interface [ComponentName]Service {
   methodName(input: InputType): Result<OutputType, ErrorType>;
 }
 ```
-- Preconditions:
-- Postconditions:
-- Invariants:
+- 事前条件:
+- 事後条件:
+- 不変条件:
 
-##### API Contract
-| Method | Endpoint | Request | Response | Errors |
-|--------|----------|---------|----------|--------|
+##### API コントラクト
+| メソッド | エンドポイント | リクエスト | レスポンス | エラー |
+|---------|--------------|-----------|-----------|-------|
 | POST | /api/resource | CreateRequest | Resource | 400, 409, 500 |
 
-##### Event Contract
-- Published events:  
-- Subscribed events:  
-- Ordering / delivery guarantees:
+##### イベントコントラクト
+- 発行イベント:  
+- 購読イベント:  
+- 順序 / 配信保証:
 
-##### Batch / Job Contract
-- Trigger:  
-- Input / validation:  
-- Output / destination:  
-- Idempotency & recovery:
+##### バッチ / ジョブコントラクト
+- トリガー:  
+- 入力 / バリデーション:  
+- 出力 / 送信先:  
+- 冪等性とリカバリ:
 
-##### State Management
-- State model:  
-- Persistence & consistency:  
-- Concurrency strategy:
+##### 状態管理
+- 状態モデル:  
+- 永続化と一貫性:  
+- 並行性戦略:
 
-**Implementation Notes**
-- Integration: 
-- Validation: 
-- Risks:
+**実装ノート**
+- 統合: 
+- バリデーション: 
+- リスク:
 
-## Data Models
+## データモデル
 
-Focus on the portions of the data landscape that change with this feature.
+この機能で変更されるデータ領域の部分に焦点を当てる。
 
-### Domain Model
-- Aggregates and transactional boundaries
-- Entities, value objects, domain events
-- Business rules & invariants
-- Optional Mermaid diagram for complex relationships
+### ドメインモデル
+- 集約とトランザクション境界
+- エンティティ、値オブジェクト、ドメインイベント
+- ビジネスルールと不変条件
+- 複雑な関連がある場合は Mermaid 図（任意）
 
-### Logical Data Model
+### 論理データモデル
 
-**Structure Definition**:
-- Entity relationships and cardinality
-- Attributes and their types
-- Natural keys and identifiers
-- Referential integrity rules
+**構造定義**:
+- エンティティ関連とカーディナリティ
+- 属性とその型
+- ナチュラルキーと識別子
+- 参照整合性ルール
 
-**Consistency & Integrity**:
-- Transaction boundaries
-- Cascading rules
-- Temporal aspects (versioning, audit)
+**一貫性と整合性**:
+- トランザクション境界
+- カスケードルール
+- 時間的側面（バージョニング、監査）
 
-### Physical Data Model
-**When to include**: When implementation requires specific storage design decisions
+### 物理データモデル
+**含めるタイミング**: 実装に特定のストレージ設計判断が必要な場合
 
-**For Relational Databases**:
-- Table definitions with data types
-- Primary/foreign keys and constraints
-- Indexes and performance optimizations
-- Partitioning strategy for scale
+**リレーショナルデータベースの場合**:
+- データ型を含むテーブル定義
+- 主キー/外部キーと制約
+- インデックスとパフォーマンス最適化
+- スケールのためのパーティショニング戦略
 
-**For Document Stores**:
-- Collection structures
-- Embedding vs referencing decisions
-- Sharding key design
-- Index definitions
+**ドキュメントストアの場合**:
+- コレクション構造
+- 埋め込み vs 参照の判断
+- シャーディングキー設計
+- インデックス定義
 
-**For Event Stores**:
-- Event schema definitions
-- Stream aggregation strategies
-- Snapshot policies
-- Projection definitions
+**イベントストアの場合**:
+- イベントスキーマ定義
+- ストリーム集約戦略
+- スナップショットポリシー
+- プロジェクション定義
 
-**For Key-Value/Wide-Column Stores**:
-- Key design patterns
-- Column families or value structures
-- TTL and compaction strategies
+**キーバリュー/ワイドカラムストアの場合**:
+- キー設計パターン
+- カラムファミリまたは値構造
+- TTL とコンパクション戦略
 
-### Data Contracts & Integration
+### データコントラクトと統合
 
-**API Data Transfer**
-- Request/response schemas
-- Validation rules
-- Serialization format (JSON, Protobuf, etc.)
+**API データ転送**
+- リクエスト/レスポンススキーマ
+- バリデーションルール
+- シリアライズ形式（JSON, Protobuf など）
 
-**Event Schemas**
-- Published event structures
-- Schema versioning strategy
-- Backward/forward compatibility rules
+**イベントスキーマ**
+- 発行イベント構造
+- スキーマバージョニング戦略
+- 後方/前方互換性ルール
 
-**Cross-Service Data Management**
-- Distributed transaction patterns (Saga, 2PC)
-- Data synchronization strategies
-- Eventual consistency handling
+**サービス間データ管理**
+- 分散トランザクションパターン（Saga, 2PC）
+- データ同期戦略
+- 結果整合性の扱い
 
-Skip subsections that are not relevant to this feature.
+この機能に関連しないサブセクションはスキップしてよい。
 
-## Error Handling
+## エラーハンドリング
 
-### Error Strategy
-Concrete error handling patterns and recovery mechanisms for each error type.
+### エラー戦略
+エラー種別ごとの具体的なエラーハンドリングパターンとリカバリ機構。
 
-### Error Categories and Responses
-**User Errors** (4xx): Invalid input → field-level validation; Unauthorized → auth guidance; Not found → navigation help
-**System Errors** (5xx): Infrastructure failures → graceful degradation; Timeouts → circuit breakers; Exhaustion → rate limiting  
-**Business Logic Errors** (422): Rule violations → condition explanations; State conflicts → transition guidance
+### エラーカテゴリと対応
+**ユーザーエラー** (4xx): 入力無効 → フィールド単位のバリデーション; 認証なし → 認証ガイダンス; 未検出 → ナビゲーション案内
+**システムエラー** (5xx): インフラ障害 → グレースフルデグラデーション; タイムアウト → サーキットブレーカー; 枯渇 → レート制限
+**ビジネスロジックエラー** (422): ルール違反 → 条件説明; 状態競合 → 遷移ガイダンス
 
-**Process Flow Visualization** (when complex business logic exists):
-Include Mermaid flowchart only for complex error scenarios with business workflows.
+**プロセスフロー可視化**（複雑なビジネスロジックがある場合）:
+複雑なエラーフローを伴うビジネスワークフローの場合のみ Mermaid フローチャートを含める。
 
-### Monitoring
-Error tracking, logging, and health monitoring implementation.
+### 監視
+エラートラッキング、ロギング、ヘルス監視の実装。
 
-## Testing Strategy
+## テスト戦略
 
-### Default sections (adapt names/sections to fit the domain)
-- Unit Tests: 3–5 items from core functions/modules (e.g., auth methods, subscription logic)
-- Integration Tests: 3–5 cross-component flows (e.g., webhook handling, notifications)
-- E2E/UI Tests (if applicable): 3–5 critical user paths (e.g., forms, dashboards)
-- Performance/Load (if applicable): 3–4 items (e.g., concurrency, high-volume ops)
+### デフォルトセクション（名前・構成はドメインに合わせて調整）
+- 単体テスト: コア関数/モジュールから 3～5 項目（例: 認証メソッド、サブスクリプションロジック）
+- 結合テスト: コンポーネント間フロー 3～5 項目（例: webhook 処理、通知）
+- E2E/UI テスト（該当する場合）: クリティカルユーザーパス 3～5 項目（例: フォーム、ダッシュボード）
+- パフォーマンス/負荷テスト（該当する場合）: 3～4 項目（例: 並行性、高負荷処理）
 
-## Optional Sections (include when relevant)
+## オプションセクション（関連する場合に含める）
 
-### Security Considerations
-_Use this section for features handling auth, sensitive data, external integrations, or user permissions. Capture only decisions unique to this feature; defer baseline controls to steering docs._
-- Threat modeling, security controls, compliance requirements
-- Authentication and authorization patterns
-- Data protection and privacy considerations
+### セキュリティ考慮事項
+_認証、機密データ、外部統合、ユーザー権限を扱う機能で使用する。この機能固有の判断のみを記載し、ベースライン管理は設計原則ドキュメントに委ねること。_
+- 脅威モデリング、セキュリティ制御、コンプライアンス要件
+- 認証と認可のパターン
+- データ保護とプライバシー考慮事項
 
-### Performance & Scalability
-_Use this section when performance targets, high load, or scaling concerns exist. Record only feature-specific targets or trade-offs and rely on steering documents for general practices._
-- Target metrics and measurement strategies
-- Scaling approaches (horizontal/vertical)
-- Caching strategies and optimization techniques
+### パフォーマンスとスケーラビリティ
+_パフォーマンス目標、高負荷、スケーリング concern が存在する場合に使用する。機能固有の目標やトレードオフのみを記録し、一般的なプラクティスは設計原則ドキュメントに委ねること。_
+- 目標メトリクスと計測戦略
+- スケーリングアプローチ（水平/垂直）
+- キャッシュ戦略と最適化手法
 
-### Migration Strategy
-Include a Mermaid flowchart showing migration phases when schema/data movement is required.
-- Phase breakdown, rollback triggers, validation checkpoints
+### 移行戦略
+スキーマやデータの移動が必要な場合、移行フェーズを示す Mermaid フローチャートを含める。
+- フェーズ分割、ロールバックトリガー、バリデーションチェックポイント
 
-## Supporting References (Optional)
-- Create this section only when keeping the information in the main body would hurt readability (e.g., very long TypeScript definitions, vendor option matrices, exhaustive schema tables). Keep decision-making context in the main sections so the design stays self-contained.
-- Link to the supporting references from the main text instead of inlining large snippets.
-- Background research notes and comparisons continue to live in `research.md`, but their conclusions must be summarized in the main design.
+## 参考資料（任意）
+- 本文に情報を含めると可読性を損なう場合のみこのセクションを作成する（例: 非常に長い TypeScript 定義、ベンダーオプションのマトリクス、網羅的なスキーマテーブル）。判断コンテキストは主要セクションに残し、設計が自己完結するようにすること。
+- 大きなスニペットをインライン化する代わりに、本文から参考資料へのリンクを貼ること。
+- 調査ノートや比較は引き続き `research.md` に記述するが、その結論は主要設計書内で要約すること。
