@@ -476,6 +476,91 @@ def quick_impact_from_diff(project_dir: Path) -> dict:
     }
 
 
+# ── Rename モード（要件IDの一括書き換え） ──
+
+
+def _make_id_re(id_str: str) -> re.Pattern:
+    """要件ID（例: 1.1）をスタンドアロントークンとしてマッチする正規表現。
+    1.1 が 1.10 や 11.1 の一部としてマッチしないよう境界を設定する。"""
+    escaped = re.escape(id_str)
+    return re.compile(rf'(?<!\d){escaped}(?!\.?\d)')
+
+
+def cmd_rename(project_dir: Path, old_id: str, new_id: str, dry_run: bool = False) -> dict:
+    """
+    --rename OLD NEW: プロジェクト内の全ファイルで要件IDを一括書き換え。
+    dry-run モードでは変更せずにプレビュー表示。
+    """
+    id_re = _make_id_re(old_id)
+
+    # 各ファイル種別のスキャン定義: (glob_pattern, replacement logic description)
+    # ファイルを収集してから内容を書き換える
+    changes: list[dict] = []
+
+    def _scan_and_replace(filepath: Path, label: str, content_transform) -> None:
+        nonlocal changes
+        try:
+            content = filepath.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            return
+        new_content = content_transform(content)
+        if new_content != content:
+            rel = str(filepath.relative_to(project_dir)) if filepath.is_relative_to(project_dir) else str(filepath)
+            changes.append({"file": rel, "label": label})
+            if not dry_run:
+                filepath.write_text(new_content)
+
+    # 1. コードファイル: @impl OLD → @impl NEW
+    code_suffixes = (".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb", ".java", ".kt", ".swift")
+    for suffix in code_suffixes:
+        for fpath in sorted(project_dir.rglob(f"*{suffix}")):
+            if any(part in EXCLUDE_DIRS for part in fpath.parts):
+                continue
+            _scan_and_replace(fpath, "@impl", lambda c: id_re.sub(new_id, c))
+
+    # 2. テストファイル: @verifies OLD → @verifies NEW
+    # （テストファイルはコードファイルと同じ拡張子の一部なので重複スキャンになるが、
+    #  id_re 置換は冪等なので問題ない）
+    test_suffixes = tuple(
+        sorted(set(p.split("*")[-1] for p in TEST_FILE_PATTERNS if p.endswith(".*")))
+    )
+    # test_suffixes は code_suffixes の部分集合なのでスキップ可だが、
+    # 分かりやすさのため別ラベルで再度スキャンしても安全
+
+    # 3. .md ファイル: @spec OLD / @satisfies OLD
+    for fpath in sorted(project_dir.rglob("*.md")):
+        if any(part in EXCLUDE_DIRS for part in fpath.parts):
+            continue
+        _scan_and_replace(fpath, "@spec/@satisfies", lambda c: id_re.sub(new_id, c))
+
+    # 4. tasks.md: _Requirements: OLD_ / _Depends: OLD_
+    for fpath in sorted(project_dir.rglob("tasks.md")):
+        if any(part in EXCLUDE_DIRS for part in fpath.parts):
+            continue
+        _scan_and_replace(fpath, "_Requirements_/_Depends_", lambda c: id_re.sub(new_id, c))
+
+    # 5. .trace-mapping.yaml: id: "OLD" → id: "NEW"
+    mapping_path = project_dir / TRACE_MAPPING_PATH
+    if mapping_path.exists():
+        def _replace_mapping_id(content: str) -> str:
+            # id: "OLD" → id: "NEW" （YAML内の id フィールドのみ）
+            return re.sub(
+                rf'id:\s*"{old_id}"',
+                f'id: "{new_id}"',
+                content,
+            )
+        _scan_and_replace(mapping_path, "id: in .trace-mapping.yaml", _replace_mapping_id)
+
+    return {
+        "query_type": "rename",
+        "old_id": old_id,
+        "new_id": new_id,
+        "dry_run": dry_run,
+        "changes": changes,
+        "total": len(changes),
+    }
+
+
 # ── メイン ──
 
 
@@ -618,6 +703,17 @@ def _print_human(result: dict):
             if tasks:
                 print(f"    {file_label}: Tasks: {tasks}")
 
+    # Rename モード出力
+    if qtype == "rename":
+        mode = " (dry-run)" if result.get("dry_run") else ""
+        print(f"\U0001f4dd Rename{mode}: {result['old_id']} \u2192 {result['new_id']}")
+        print(f"  Total: {result['total']} file(s)")
+        for ch in result.get("changes", []):
+            print(f"    \u270f\ufe0f {ch['file']}  ({ch['label']})")
+        if result.get("dry_run") and result["total"] > 0:
+            print()
+            print("  Run without --dry-run to apply changes.")
+
 
 def main():
     parser = argparse.ArgumentParser(description="CRG + .trace-mapping.yaml 影響分析、または --quick 簡易影響分析")
@@ -626,6 +722,9 @@ def main():
     group.add_argument("--file", type=str, help="影響分析: コードファイルから仕様影響")
     group.add_argument("--diff", action="store_true", help="影響分析: git diff から")
     group.add_argument("--list", action="store_true", help="全マッピング一覧")
+    group.add_argument("--rename", nargs=2, metavar=("OLD", "NEW"),
+                       help="要件IDの一括書き換え（例: --rename 1.1 2.1）。--dry-run でプレビュー")
+    parser.add_argument("--dry-run", action="store_true", help="--rename の変更をプレビュー（実際には書き換えない）")
     parser.add_argument("--crg", action="store_true", help="CRG (code-review-graph) ツールと連携")
     parser.add_argument("--crg-hook", type=str, help="CRG クエリ用の外部スクリプト")
     parser.add_argument("--json", action="store_true", help="JSON 出力")
@@ -641,7 +740,14 @@ def main():
 
     result: dict[str, Any] = {}
 
-    if args.quick:
+    # Rename モード（--rename が指定された場合）
+    if args.rename:
+        old_id, new_id = args.rename
+        if old_id == new_id:
+            result = {"error": "OLD and NEW IDs are the same", "query_type": "rename"}
+        else:
+            result = cmd_rename(project_dir, old_id, new_id, args.dry_run)
+    elif args.quick:
         # Quick モード: .trace-mapping.yaml 不要
         if args.spec_id:
             result = quick_impact_from_spec(project_dir, args.spec_id)
