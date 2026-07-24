@@ -1,41 +1,18 @@
-# Project Structure
+# プロジェクト構造
 
-## Organization Philosophy
+## ディレクトリ構成
 
-[Describe approach: feature-first, layered, domain-driven, etc.]
-
-## Directory Patterns
-
-### [Pattern Name]
-**Location**: `/path/`  
-**Purpose**: [What belongs here]  
-**Example**: [Brief example]
-
-### [Pattern Name]
-**Location**: `/path/`  
-**Purpose**: [What belongs here]  
-**Example**: [Brief example]
-
-## Naming Conventions
-
-- **Files**: [Pattern, e.g., PascalCase, kebab-case]
-- **Components**: [Pattern]
-- **Functions**: [Pattern]
-
-## Import Organization
-
-```typescript
-// Example import patterns
-import { Something } from '@/path'  // Absolute
-import { Local } from './local'     // Relative
+```
+[主要なディレクトリとその責務]
 ```
 
-**Path Aliases**:
-- `@/`: [Maps to]
+## 命名規則
 
-## Code Organization Principles
+[ファイル名、クラス名、関数名の命名規則]
 
-[Key architectural patterns and dependency rules]
+## 設計パターン
+
+[プロジェクト全体で使用される主要な設計パターン]
 
 ---
-_Document patterns, not file trees. New files following patterns shouldn't require updates_
+_コードベースをナビゲートするための高レベルな構造情報_

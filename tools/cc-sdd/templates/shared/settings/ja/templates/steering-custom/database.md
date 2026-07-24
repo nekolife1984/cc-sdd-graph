@@ -1,46 +1,20 @@
-# Database Standards
+# データベース
 
-[Purpose: guide schema design, queries, migrations, and integrity]
+## 使用DB
 
-## Philosophy
-- Model the domain first; optimize after correctness
-- Prefer explicit constraints; let database enforce invariants
-- Query only what you need; measure before optimizing
+[PostgreSQL / MySQL / MongoDB など、バージョン情報]
 
-## Naming & Types
-- Tables: `snake_case`, plural (`users`, `order_items`)
-- Columns: `snake_case` (`created_at`, `user_id`)
-- FKs: `{table}_id` referencing `{table}.id`
-- Types: timezone-aware timestamps; strong IDs; precise money types
+## 命名規則
 
-## Relationships
-- 1:N: FK in child
-- N:N: join table with compound key
-- 1:1: FK + UNIQUE
+[テーブル名、カラム名、インデックス名の命名規則]
 
-## Migrations
-- Immutable migrations; always add rollback
-- Small, focused steps; test on non-prod first
-- Naming: `{seq}_{action}_{object}` (e.g., `002_add_email_index`)
+## マイグレーション方針
 
-## Query Patterns
-- ORM for simple CRUD and safety; raw SQL for complex/perf-critical
-- Avoid N+1 (eager load/batching); paginate large sets
-- Index FKs and frequently filtered/sorted columns
+[マイグレーションツール、バージョニング戦略]
 
-## Connection & Transactions
-- Use pooling (size/timeouts based on workload)
-- One connection per unit of work; close/return promptly
-- Wrap multi-step changes in transactions
+## バックアップ戦略
 
-## Data Integrity
-- Use NOT NULL/UNIQUE/CHECK/FK constraints
-- Validate at DB when appropriate (defense in depth)
-- Prefer generated columns for consistent derivations
-
-## Backup & Recovery
-- Regular backups with retention; test restores
-- Document RPO/RTO targets; monitor backup jobs
+[バックアップ頻度、保持期間、リストア手順]
 
 ---
-_Focus on patterns and decisions. No environment-specific settings._
+_データベース設計と運用の標準_

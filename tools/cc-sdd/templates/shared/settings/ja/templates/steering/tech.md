@@ -1,45 +1,21 @@
-# Technology Stack
+# 技術スタック
 
-## Architecture
+## 言語／ランタイム
 
-[High-level system design approach]
+[主要言語、バージョン、実行環境]
 
-## Core Technologies
+## フレームワーク／ライブラリ
 
-- **Language**: [e.g., TypeScript, Python]
-- **Framework**: [e.g., React, Next.js, Django]
-- **Runtime**: [e.g., Node.js 20+]
+| レイヤー | 選択 | バージョン | 備考 |
+|---------|------|-----------|------|
+| フロントエンド | | | |
+| バックエンド | | | |
+| データベース | | | |
+| インフラ | | | |
 
-## Key Libraries
+## 開発ツール
 
-[Only major libraries that influence development patterns]
-
-## Development Standards
-
-### Type Safety
-[e.g., TypeScript strict mode, no `any`]
-
-### Code Quality
-[e.g., ESLint, Prettier rules]
-
-### Testing
-[e.g., Jest, coverage requirements]
-
-## Development Environment
-
-### Required Tools
-[Key tools and version requirements]
-
-### Common Commands
-```bash
-# Dev: [command]
-# Build: [command]
-# Test: [command]
-```
-
-## Key Technical Decisions
-
-[Important architectural choices and rationale]
+[ビルドツール、テストランナー、Linter、フォーマッターなど]
 
 ---
-_Document standards and patterns, not every dependency_
+_プロジェクト全体の技術的な選択と制約_
