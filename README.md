@@ -4,11 +4,22 @@ cc-sdd をフォークし、**code-review-graph (CRG)** による仕様↔コー
 
 ## Quick Start
 
+### macOS / Linux
 ```bash
-# ワンコマンドで全部入り
 bash <(curl -s https://raw.githubusercontent.com/nekolife1984/cc-sdd-graph/main/scripts/quickstart.sh)
 ```
 
+### Windows (PowerShell)
+```powershell
+# ダウンロードして実行
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/nekolife1984/cc-sdd-graph/main/scripts/quickstart.ps1 -OutFile quickstart.ps1
+.\quickstart.ps1
+# または gh コマンドがある場合
+gh repo clone nekolife1984/cc-sdd-graph
+.\cc-sdd-graph\scripts\quickstart.ps1
+```
+
+### 共通
 このスクリプトが以下を自動で行います:
 1. cc-sdd-graph スキルのインストール（エージェント・言語を選択）
 2. code-review-graph のインストールと MCP 設定
