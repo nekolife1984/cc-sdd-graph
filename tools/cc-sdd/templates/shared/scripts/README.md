@@ -33,6 +33,26 @@ ln -sf ../../.agents/scripts/pre-commit.sh .git/hooks/pre-commit
 - コード変更をスナップショットに記録
 - 新しい `@impl` タグの有無をチェック
 
+フルチェック（全9チェック + check-trace-completeness.py）を有効にするには:
+```bash
+TRACE_FULL=1 git commit -m "message"
+```
+
+### 1b. pre-push hook（opt-in）
+
+プッシュ前に3段階のフルチェックを実行する（`.agents/scripts/ci-check.sh` 相当）。
+
+```bash
+ln -sf ../../.agents/scripts/pre-push.sh .git/hooks/pre-push
+```
+
+プッシュ時に以下を自動実行:
+1. ❌ Trace Completeness Gate — 全9チェック
+2. ❌ Drift Check — コードと仕様書の乖離検出
+3. ✅ Impact Summary — 影響範囲レポート（参考）
+
+スキップ: `SKIP_TRACE=1 git push`
+
 ### 2. CI/CD ゲート（GitHub Actions の場合） — 3段階
 
 テンプレートファイルをプロジェクトにコピーするだけで有効になる:

@@ -1,21 +1,48 @@
-# pre-commit hook installation
+# Traceability Git Hooks
 
-Run this once to set up the hook:
+Run these once to set up the hooks:
+
+## 1. pre-commit hook（軽量・推奨）
 
 ```bash
 ln -sf ../../.agents/scripts/pre-commit.sh .git/hooks/pre-commit
 ```
 
-This automatically runs on every `git commit`:
-- Update traceability snapshot (`check_drift.py --snapshot`)
-- Check for missing `@impl` tags (`extract_tags.py --check-missing`)
+コミットごとに自動実行:
+- ✅ Trace snapshot update (`check_drift.py --snapshot`)
+- ✅ Missing `@impl` tag check (`extract_tags.py --check-missing`)
 
-## Related
+フルチェックを有効にするには（全9チェックを含む）:
+```bash
+TRACE_FULL=1 git commit -m "message"
+```
+またはエイリアス設定:
+```bash
+git config alias.c "commit -a -S"
+git config alias.cf "!TRACE_FULL=1 git commit"
+```
 
-- **`ci-check.sh`** (opt-in): CIと同じ3段階チェック（全9チェック＋ドリフト＋影響分析）を
-  コミット前にローカルで実行。`cp .agents/scripts/ci-check.sh` して `bash ci-check.sh`。
-  pre-push hook としても使えます: `ln -sf ../../.agents/scripts/ci-check.sh .git/hooks/pre-push`
-- See `.agents/scripts/README.md` for full setup guide including:
-  - CI/CD gate configuration
-  - Hermes cron monitoring setup
-  - Detailed script usage
+## 2. pre-push hook（本格チェック・opt-in）
+
+```bash
+ln -sf ../../.agents/scripts/pre-push.sh .git/hooks/pre-push
+```
+
+プッシュごとに3段階のトレーサビリティチェックを実行:
+1. ❌ Trace Completeness Gate — 全9チェック（`check-trace-completeness.py`）
+2. ❌ Drift Check — コードと仕様書の乖離検出（`check_drift.py --diff --gate`）
+3. ✅ Impact Summary — 影響範囲レポート（参考、非ブロッキング）
+
+全て通過でプッシュ続行、失敗で中断。
+
+スキップする場合:
+```bash
+SKIP_TRACE=1 git push
+```
+
+## 削除
+
+```bash
+rm .git/hooks/pre-commit
+rm .git/hooks/pre-push
+```
