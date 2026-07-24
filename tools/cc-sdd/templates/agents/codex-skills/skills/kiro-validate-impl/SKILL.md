@@ -104,20 +104,13 @@ For each detected feature:
 - If no trustworthy smoke command can be identified, or the required runtime environment is unavailable → `MANUAL_VERIFY_REQUIRED`
 
 **D.5 Trace Completeness Gate**
-- Run the comprehensive traceability gate to verify all trace elements:
+- Run the trace completeness gate to verify all trace elements:
   ```bash
   python3 .agents/scripts/check-trace-completeness.py --project-dir <project-root>
   ```
-- Checks performed:
-  - **@impl ↔ .trace-mapping.yaml**: All `.trace-mapping.yaml` entries have matching `# @impl X.Y` tags in code
-  - **code.files**: Files referenced in `.trace-mapping.yaml` exist and contain matching `@impl` tags
-  - **code.symbols**: Symbols (functions/classes) listed in `.trace-mapping.yaml` exist in the referenced code files
-  - **@module tags**: Code files with `@impl` tags also declare `# @module` tags; `.trace-mapping.yaml` module entries have matching code tags
-  - **_Requirements:_ trace**: Requirement IDs referenced in `tasks.md` via `_Requirements:` have entries in `.trace-mapping.yaml`
-  - **_Depends:_ syntax**: `_Depends:` annotations in `tasks.md` have valid format and reference existing task IDs
+- Run `check-trace-completeness.py --help` for available checks and options
 - If any check fails → flag as Critical (missing traceability = features not linked to specs)
 - If `.trace-mapping.yaml` doesn't exist but the project uses cc-sdd specs → flag as Warning (traceability not configured)
-- Run specific checks with `--check impl,files,symbols`
 
 #### Judgment Checks (read code, compare to spec)
 

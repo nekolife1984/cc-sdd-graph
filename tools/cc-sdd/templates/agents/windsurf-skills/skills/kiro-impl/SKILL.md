@@ -149,7 +149,7 @@ After commit (auto mode) or task completion (manual mode):
 2. Check if detected tags exist in `.trace-mapping.yaml`
 3. If not, add new entries following existing format (`id: "X.Y"`, `spec:`, `design:`, `code.files`, `code.symbols`, `tasks:`, `tags: ["@impl"]`)
 4. If `.trace-mapping.yaml` doesn't exist, create it
-5. **Run trace completeness gate**: `python3 .agents/scripts/check-trace-completeness.py` — verify @impl tags, files, symbols, @module, _Requirements:_ trace, and _Depends:_ syntax. If it fails, fix the gaps before proceeding.
+5. **Run trace completeness gate**: `python3 .agents/scripts/check-trace-completeness.py` — verify all trace elements. If it fails, fix the gaps before proceeding.
 
 **g) Debug subagent** (triggered by BLOCKED, NEEDS_CONTEXT unresolved, or REJECTED after 2 remediation rounds):
 

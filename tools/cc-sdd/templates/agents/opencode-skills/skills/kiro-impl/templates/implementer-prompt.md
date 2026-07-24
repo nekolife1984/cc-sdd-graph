@@ -57,7 +57,6 @@ Before self-review, tag each changed file with the requirement sections you impl
   ```bash
   python3 .agents/scripts/check-trace-completeness.py
   ```
-  This verifies @impl ↔ .trace-mapping.yaml, code.files existence, code.symbols, @module tags, _Requirements:_ trace, and _Depends:_ syntax.
   If it fails, fix the gaps and re-run until it passes.
 
 ### Step 5: Self-Review
