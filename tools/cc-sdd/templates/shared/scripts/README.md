@@ -114,6 +114,7 @@ python3 .agents/scripts/impact.py --list
 | `impact.py` | 仕様↔コードの双方向影響分析 | 変更前に影響範囲を確認 |
 | `check_drift.py` | スナップショットベースのドリフト検出 | CI / pre-commit / cron |
 | `pre-commit.sh` | pre-commit hook（スナップショット自動更新） | コミット時 |
+| `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（@impl→.trace-mapping, code.files, code.symbols, @module, _Requirements:_, _Depends:_） | 実装完了時 / CI |
 
 ## よくある使い方
 

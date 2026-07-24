@@ -103,14 +103,21 @@ For each detected feature:
 - If boot produces a runtime crash, unhandled exception, module-load failure, native ABI mismatch, or missing required env/config → NO-GO.
 - If no trustworthy smoke command can be identified, or the required runtime environment is unavailable → `MANUAL_VERIFY_REQUIRED`
 
-**D.5 @impl Tag Completeness**
-- Check that all `.trace-mapping.yaml` entries have corresponding `# @impl X.Y` tags in the code:
+**D.5 Trace Completeness Gate**
+- Run the comprehensive traceability gate to verify all trace elements:
   ```bash
-  python3 .agents/scripts/check-impl-completeness.py --project-dir <project-root>
+  python3 .agents/scripts/check-trace-completeness.py --project-dir <project-root>
   ```
-- If the script fails → flag as Critical (missing traceability = features not linked to specs)
+- Checks performed:
+  - **@impl ↔ .trace-mapping.yaml**: All `.trace-mapping.yaml` entries have matching `# @impl X.Y` tags in code
+  - **code.files**: Files referenced in `.trace-mapping.yaml` exist and contain matching `@impl` tags
+  - **code.symbols**: Symbols (functions/classes) listed in `.trace-mapping.yaml` exist in the referenced code files
+  - **@module tags**: Code files with `@impl` tags also declare `# @module` tags; `.trace-mapping.yaml` module entries have matching code tags
+  - **_Requirements:_ trace**: Requirement IDs referenced in `tasks.md` via `_Requirements:` have entries in `.trace-mapping.yaml`
+  - **_Depends:_ syntax**: `_Depends:` annotations in `tasks.md` have valid format and reference existing task IDs
+- If any check fails → flag as Critical (missing traceability = features not linked to specs)
 - If `.trace-mapping.yaml` doesn't exist but the project uses cc-sdd specs → flag as Warning (traceability not configured)
-- This ensures no `@impl` tag was forgotten during implementation
+- Run specific checks with `--check impl,files,symbols`
 
 #### Judgment Checks (read code, compare to spec)
 

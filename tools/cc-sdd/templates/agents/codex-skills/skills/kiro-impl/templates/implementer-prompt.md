@@ -53,11 +53,12 @@ Before self-review, tag each changed file with the requirement sections you impl
 
 - Add `# @impl X.Y` comments to each changed file, using the exact section numbers from `requirements.md` (e.g., `# @impl 1.1, 1.2`)
 - Place the tag near the function/class that implements the requirement
-- If `.trace-mapping.yaml` exists in the project root, run the completeness gate:
+- If `.trace-mapping.yaml` exists in the project root, run the trace completeness gate:
   ```bash
-  python3 .agents/scripts/check-impl-completeness.py
+  python3 .agents/scripts/check-trace-completeness.py
   ```
-  If it fails, add the missing tags and re-run until it passes.
+  This verifies @impl ↔ .trace-mapping.yaml, code.files existence, code.symbols, @module tags, _Requirements:_ trace, and _Depends:_ syntax.
+  If it fails, fix the gaps and re-run until it passes.
 
 ### Step 5: Self-Review
 - Review your own changes before reporting back

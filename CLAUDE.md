@@ -25,7 +25,7 @@ Scripts in `.agents/scripts/` provide automated impact analysis:
 | `extract_tags.py` | Extract `@impl`/`@module`/`@feature` tags from code |
 | `impact.py` | Bidirectional spec↔code impact analysis |
 | `check_drift.py` | Snapshot-based drift detection between code and specs |
-| `check-impl-completeness.py` | **Gate**: Verify `.trace-mapping.yaml` entries have matching `@impl` tags in code |
+| `check-trace-completeness.py` | **Gate**: Verify @impl tags, code.files, code.symbols, @module tags, _Requirements:_ trace, and _Depends:_ syntax |
 
 ## Project Context
 
