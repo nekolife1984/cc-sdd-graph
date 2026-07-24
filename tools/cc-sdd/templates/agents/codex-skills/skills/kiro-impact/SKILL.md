@@ -55,17 +55,27 @@ For files without direct mapping:
 ## Impact Report: {file-path}
 - QUERY_TYPE: file | diff | auto
 
+### Band Summary
+- 🟢 GREEN (auto-approve): N items (mapping + impl + tests)
+- 🟡 AMBER (review required): N items (partial evidence)
+- ⚪ GRAY (reference only): N items (weak match)
+
 ### Affected Requirements
 | ID | Description | Priority |
 |----|-------------|----------|
 | 1.1 | Message send and response | 🔴 Direct |
 | 2.1 | Streaming response | 🟡 Indirect (CRG) |
+```
 
-### Affected Tasks
-- X.Y — task description
+Band scoring:
+- **GREEN** (≥50pts): .trace-mapping entry + @impl tag + tests
+- **AMBER** (≥20pts): CRG transitive dep or partial grep match
+- **GRAY** (<20pts): weak reference (full-text hit only)
 
-### Affected Design Sections
-- design.md#section-name
+Filter by band:
+```bash
+impact.py --spec-id 1.1 --band amber+    # show only amber+ items
+impact.py --quick --diff --band green     # show only green items
 ```
 
 ## Step 5: Suggest `.trace-mapping.yaml` Updates

@@ -39,11 +39,16 @@ For each impacted symbol, call CRG MCP tools:
 
 ## Step 3: Generate Impact Report
 
-Output a structured report:
+Output a structured report with band analysis:
 
 ```md
 ## Trace Report: Spec {spec-id}
 - SPEC: .kiro/specs/{feature}/requirements.md#{section}
+
+### Band Summary
+- 🟢 GREEN (auto-approve): N files (mapping + @impl + tests)
+- 🟡 AMBER (review required): N files (partial evidence)
+- ⚪ GRAY (reference only): N files (weak match)
 
 ### Direct Impact (.trace-mapping.yaml)
 | Category | Count | List |
@@ -62,6 +67,7 @@ Output a structured report:
 - Implement/fix affected tasks: `/kiro-impl {feature} {task-id}`
 - Update affected docs: .kiro/specs/{feature}/
 - Check drift after changes: `python3 .agents/scripts/check_drift.py --snapshot`
+- Filter by band: `python3 .agents/scripts/impact.py --spec-id {spec-id} --band amber+`
 ```
 
 ## Step 4: Flag Unregistered Impacts
