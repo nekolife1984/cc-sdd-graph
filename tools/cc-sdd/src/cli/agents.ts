@@ -48,6 +48,7 @@ const buildGuideSteps = (agent: AgentType): string[] => {
     `Launch ${definition.label} and run ${definition.commands.spec} to create a new specification.`,
     `Tip: Steering holds persistent project knowledge (patterns, standards, org-wide policies). Kick off ${definition.commands.steering} (essential for existing projects) and ${definition.commands.steeringCustom}. Maintain regularly.`,
     'Tip: Update `{{KIRO_DIR}}/settings/templates/` like `requirements.md`, `design.md`, and `tasks.md` so the generated steering and specs follow your team\'s and project\'s development process.',
+    'Optional: run `.agents/scripts/setup-crg.sh` to install code-review-graph for code-graph-aware spec→code impact analysis.',
   ];
 
   if (definition.completionGuide?.prependSteps) {
