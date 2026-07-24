@@ -4,6 +4,11 @@ impact.py — CRG (code-review-graph) + .trace-mapping.yaml による影響分�
 --quick モードでは .trace-mapping.yaml なしでも @impl/@spec/@verifies タグの
 grep で簡易影響分析が可能。
 
+影響度バンド（Green/Amber/Gray）で各成果物の関連強度を分類:
+  🟢 GREEN  (≥50点): 強い証拠（.trace-mapping + @impl + テスト等）— 自動通過OK
+  🟡 AMBER  (≥20点): 中程度の証拠 — 要レビュー
+  ⚪ GRAY   (<20点): 弱い証拠 — 参考情報
+
 Usage:
   # 仕様→コード影響（spec-id 指定）
   python3 .agents/scripts/impact.py --spec-id 1.1
@@ -24,6 +29,10 @@ Usage:
   python3 .agents/scripts/impact.py --quick --file src/auth/login.py
   python3 .agents/scripts/impact.py --quick --spec-id 1.1
   python3 .agents/scripts/impact.py --quick --diff
+
+  # --band: バンドフィルターで結果を絞り込み
+  python3 .agents/scripts/impact.py --spec-id 1.1 --band green
+  python3 .agents/scripts/impact.py --quick --diff --band amber+
 """
 
 import argparse
@@ -63,6 +72,163 @@ TEST_FILE_PATTERNS = [
 
 # 除外ディレクトリ
 EXCLUDE_DIRS = {".git", "node_modules", ".venv", "__pycache__", "dist", "build", ".artgraph", ".trace"}
+
+# ── 影響度バンド（Green/Amber/Gray） ──
+# 証拠タイプごとの重み
+BAND_WEIGHTS = {
+    "mapping": 40,         # .trace-mapping.yaml に直接記載
+    "impl_tag": 25,        # @impl タグ
+    "verifies_tag": 20,    # @verifies タグ
+    "crg_direct": 15,      # CRG 1 hop（直接 import/呼び出し）
+    "crg_transitive": 5,   # CRG 2+ hops（推移的依存）
+    "grep": 10,            # --quick grep でタグマッチ
+    "snapshot": 10,        # スナップショットと一致
+}
+
+# バンド閾値
+BAND_GREEN_MIN = 50   # ≥50 → green
+BAND_AMBER_MIN = 20   # ≥20 → amber（未満 → gray）
+
+
+def _compute_file_band(
+    file_path: str,
+    spec_id: str,
+    in_mapping: bool = False,
+    has_impl: bool = False,
+    has_verifies: bool = False,
+    crg_hops: Optional[int] = None,
+    quick_mode: bool = False,
+) -> dict:
+    """1ファイルの影響度バンドを計算する。
+
+    Args:
+        file_path: 評価対象のファイルパス
+        spec_id: 対象要件ID
+        in_mapping: .trace-mapping.yaml に記載されているか
+        has_impl: @impl タグが一致するか
+        has_verifies: @verifies タグが一致するか
+        crg_hops: CRG 推移的距離（None = 未計測）
+        quick_mode: --quick grep モードか
+
+    Returns:
+        {"band": "green"|"amber"|"gray", "score": int, "evidence": list[dict]}
+    """
+    score = 0
+    evidence = []
+
+    if in_mapping:
+        score += BAND_WEIGHTS["mapping"]
+        evidence.append({"type": "mapping", "weight": BAND_WEIGHTS["mapping"],
+                         "detail": ".trace-mapping.yaml"})
+    if has_impl:
+        score += BAND_WEIGHTS["impl_tag"]
+        evidence.append({"type": "impl_tag", "weight": BAND_WEIGHTS["impl_tag"],
+                         "detail": f"@impl {spec_id}"})
+    if has_verifies:
+        score += BAND_WEIGHTS["verifies_tag"]
+        evidence.append({"type": "verifies_tag", "weight": BAND_WEIGHTS["verifies_tag"],
+                         "detail": f"@verifies {spec_id}"})
+    if crg_hops is not None:
+        if crg_hops <= 1:
+            score += BAND_WEIGHTS["crg_direct"]
+            evidence.append({"type": "crg_direct", "weight": BAND_WEIGHTS["crg_direct"],
+                             "detail": f"CRG {crg_hops} hop(s)"})
+        else:
+            score += BAND_WEIGHTS["crg_transitive"]
+            evidence.append({"type": "crg_transitive", "weight": BAND_WEIGHTS["crg_transitive"],
+                             "detail": f"CRG {crg_hops} hops"})
+    if quick_mode:
+        score += BAND_WEIGHTS["grep"]
+        evidence.append({"type": "grep", "weight": BAND_WEIGHTS["grep"],
+                         "detail": "grep match"})
+
+    if score >= BAND_GREEN_MIN:
+        band = "green"
+    elif score >= BAND_AMBER_MIN:
+        band = "amber"
+    else:
+        band = "gray"
+
+    return {"band": band, "score": score, "evidence": evidence}
+
+
+def _check_file_has_tag(file_path: Path, tag_re: re.Pattern, spec_id: str) -> bool:
+    """ファイルに指定タグと要件IDのペアが含まれているか確認する。"""
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        for match in tag_re.finditer(content):
+            values = [v.strip() for v in match.group(1).replace("\uff0c", ",").split(",") if v.strip()]
+            if spec_id in values:
+                return True
+    except (UnicodeDecodeError, OSError):
+        pass
+    return False
+
+
+def _is_test_file(file_path: str) -> bool:
+    """ファイルパスがテストファイルパターンに一致するか。"""
+    from fnmatch import fnmatch
+    for pattern in TEST_FILE_PATTERNS:
+        if fnmatch(file_path, pattern):
+            return True
+    return False
+
+
+def _build_banded(files: list[str], spec_id: str, project_dir: Path,
+                  mapping_files: set[str] = set(),
+                  use_crg: bool = False, quick_mode: bool = False) -> dict:
+    """ファイルリストからバンド情報を構築する。
+
+    Returns:
+        {"green": [...], "amber": [...], "gray": [...], "summary": {...}}
+    """
+    banded: dict[str, list[dict]] = {"green": [], "amber": [], "gray": []}
+
+    for f in files:
+        fpath = Path(f) if f.startswith("/") else project_dir / f
+        in_mapping = f in mapping_files
+
+        # @impl / @verifies チェック（ファイルが存在する場合のみ）
+        has_impl = _check_file_has_tag(fpath, IMPL_TAG_RE, spec_id) if fpath.exists() else False
+        has_verifies = _check_file_has_tag(fpath, VERIFIES_TAG_RE, spec_id) if fpath.exists() else False
+
+        band_info = _compute_file_band(
+            file_path=f,
+            spec_id=spec_id,
+            in_mapping=in_mapping,
+            has_impl=has_impl,
+            has_verifies=has_verifies,
+            quick_mode=quick_mode,
+        )
+
+        band_info["file"] = f
+        banded[band_info["band"]].append(band_info)
+
+    return {
+        "green": banded["green"],
+        "amber": banded["amber"],
+        "gray": banded["gray"],
+        "summary": {"green": len(banded["green"]),
+                     "amber": len(banded["amber"]),
+                     "gray": len(banded["gray"])},
+    }
+
+
+def _filter_by_band(banded: dict, band_filter: str) -> list[str]:
+    """--band フィルターに基づいてファイルリストを絞り込む。"""
+    if band_filter == "green":
+        return [e["file"] for e in banded.get("green", [])]
+    elif band_filter == "amber":
+        return [e["file"] for e in banded.get("amber", [])]
+    elif band_filter == "gray":
+        return [e["file"] for e in banded.get("gray", [])]
+    elif band_filter == "green+":
+        return ([e["file"] for e in banded.get("green", [])] +
+                [e["file"] for e in banded.get("amber", [])])
+    elif band_filter == "amber+":
+        return ([e["file"] for e in banded.get("amber", [])] +
+                [e["file"] for e in banded.get("gray", [])])
+    return []
 
 
 def load_mapping(path: Path = TRACE_MAPPING_PATH) -> list[dict]:
@@ -202,7 +368,8 @@ def _run_crg_cli_query(subcommand: str, target: str, cli_path: str) -> Optional[
 # ── 標準モード（.trace-mapping.yaml 必要） ──
 
 
-def impact_from_spec(mappings: list[dict], spec_id: str, use_crg: bool = False) -> dict:
+def impact_from_spec(mappings: list[dict], spec_id: str, use_crg: bool = False,
+                     project_dir: Optional[Path] = None) -> dict:
     """仕様 ID から影響範囲を分析する。"""
     matched = find_by_spec_id(mappings, spec_id)
     if not matched:
@@ -238,10 +405,23 @@ def impact_from_spec(mappings: list[dict], spec_id: str, use_crg: bool = False) 
                 "crg_result": crg_result,
             })
 
+    # バンド情報を追加（project_dir があれば）
+    if project_dir:
+        mapping_files = set(result["files"])
+        result["banded"] = _build_banded(
+            files=result["files"],
+            spec_id=spec_id,
+            project_dir=project_dir,
+            mapping_files=mapping_files,
+            use_crg=use_crg,
+        )
+        result["band_summary"] = result["banded"]["summary"]
+
     return result
 
 
-def impact_from_code(mappings: list[dict], filepath: str, use_crg: bool = False) -> dict:
+def impact_from_code(mappings: list[dict], filepath: str, use_crg: bool = False,
+                     project_dir: Optional[Path] = None) -> dict:
     """コードファイルの変更から影響を受ける spec を分析する。"""
     matched = find_by_file(mappings, filepath)
     if not matched:
@@ -278,10 +458,32 @@ def impact_from_code(mappings: list[dict], filepath: str, use_crg: bool = False)
                 "crg_result": crg_result,
             })
 
+    # バンド情報（code→spec ではファイル→要件のため spec_id は複数）
+    if project_dir:
+        banded_reqs: dict[str, list[dict]] = {"green": [], "amber": [], "gray": []}
+        for req in result["affected_requirements"]:
+            fpath = project_dir / filepath
+            has_impl = _check_file_has_tag(fpath, IMPL_TAG_RE, req) if fpath.exists() else False
+            band_info = _compute_file_band(
+                file_path=filepath,
+                spec_id=req,
+                in_mapping=True,
+                has_impl=has_impl,
+            )
+            band_info["requirement"] = req
+            banded_reqs[band_info["band"]].append(band_info)
+        result["banded"] = banded_reqs
+        result["band_summary"] = {
+            "green": len(banded_reqs["green"]),
+            "amber": len(banded_reqs["amber"]),
+            "gray": len(banded_reqs["gray"]),
+        }
+
     return result
 
 
-def impact_from_diff(mappings: list[dict], use_crg: bool = False) -> dict:
+def impact_from_diff(mappings: list[dict], use_crg: bool = False,
+                     project_dir: Optional[Path] = None) -> dict:
     """git diff から変更ファイルを取得し、影響分析する。"""
     try:
         result = subprocess.run(
@@ -298,7 +500,7 @@ def impact_from_diff(mappings: list[dict], use_crg: bool = False) -> dict:
 
     all_results = []
     for f in changed_files:
-        r = impact_from_code(mappings, f, use_crg)
+        r = impact_from_code(mappings, f, use_crg, project_dir=project_dir)
         if "error" not in r:
             all_results.append(r)
 
@@ -409,6 +611,46 @@ def quick_impact_from_file(project_dir: Path, filepath: str) -> dict:
         # @spec がある requirements
         related["related_specs"][rid] = specs.get(rid, [])
 
+    # バンド情報（quick モード）
+    banded: dict[str, list[dict]] = {"green": [], "amber": [], "gray": []}
+    for rid in impl_ids:
+        # 対象ファイル自身のバンド
+        self_band = _compute_file_band(
+            file_path=rel, spec_id=rid, has_impl=True, quick_mode=True)
+        self_band["rid"] = rid
+        banded[self_band["band"]].append(self_band)
+
+        # 関連コードファイルのバンド（grep のみ）
+        for codef in related["related_impl_files"].get(rid, []):
+            code_band = _compute_file_band(
+                file_path=codef, spec_id=rid, quick_mode=True)
+            code_band["rid"] = rid
+            code_band["file"] = codef
+            banded[code_band["band"]].append(code_band)
+
+        # テストファイルのバンド（verifies + grep）
+        for testf in related["related_tests"].get(rid, []):
+            test_band = _compute_file_band(
+                file_path=testf, spec_id=rid, has_verifies=True, quick_mode=True)
+            test_band["rid"] = rid
+            test_band["file"] = testf
+            banded[test_band["band"]].append(test_band)
+
+        # 仕様書のバンド（grep のみ）
+        for specf in related["related_specs"].get(rid, []):
+            spec_band = _compute_file_band(
+                file_path=specf, spec_id=rid, quick_mode=True)
+            spec_band["rid"] = rid
+            spec_band["file"] = specf
+            banded[spec_band["band"]].append(spec_band)
+
+    related["banded"] = banded
+    related["band_summary"] = {
+        "green": len(banded["green"]),
+        "amber": len(banded["amber"]),
+        "gray": len(banded["gray"]),
+    }
+
     return related
 
 
@@ -440,6 +682,17 @@ def quick_impact_from_spec(project_dir: Path, spec_id: str) -> dict:
             "tests": result["test_files"],
             "design": result["design_files"],
         }
+
+        # バンド情報
+        all_files = result["impl_files"] + result["test_files"] + result["spec_files"] + result["design_files"]
+        banded = _build_banded(
+            files=list(set(all_files)),
+            spec_id=spec_id,
+            project_dir=project_dir,
+            quick_mode=True,
+        )
+        result["banded"] = banded
+        result["band_summary"] = banded["summary"]
     else:
         result["note"] = f"no tags found for spec-id '{spec_id}' anywhere in project"
 
@@ -564,6 +817,160 @@ def cmd_rename(project_dir: Path, old_id: str, new_id: str, dry_run: bool = Fals
 # ── メイン ──
 
 
+def _print_band_entry(entry: dict, indent: str = "    ") -> None:
+    """1エントリのバンド表示（スコア付き）。"""
+    band_icon = {"green": "\U0001f7e2", "amber": "\U0001f7e1", "gray": "\u26aa"}
+    icon = band_icon.get(entry.get("band", ""), "\u26aa")
+    score = entry.get("score", 0)
+    file_path = entry.get("file", entry.get("requirement", ""))
+    evidence_str = " + ".join(
+        f"{e['type']}:{e['weight']}" for e in entry.get("evidence", [])
+    )
+    if evidence_str:
+        print(f"{indent}{icon} {file_path}  ({evidence_str} = {score})")
+    else:
+        print(f"{indent}{icon} {file_path}")
+
+
+def _print_banded(banded: dict, spec_id: str) -> None:
+    """バンド別に分類された結果を表示する。"""
+    labels = {
+        "green": ("GREEN", "auto-approve"),
+        "amber": ("AMBER", "review required"),
+        "gray": ("GRAY", "reference only"),
+    }
+    icons = {"green": "\U0001f7e2", "amber": "\U0001f7e1", "gray": "\u26aa"}
+
+    for band_key in ("green", "amber", "gray"):
+        entries = banded.get(band_key, [])
+        if not entries:
+            continue
+        label, note = labels.get(band_key, ("", ""))
+        icon = icons.get(band_key, "")
+        print(f"\n{icon} {label} ({note}) — {len(entries)} item(s)")
+        for entry in entries:
+            _print_band_entry(entry)
+
+
+def _print_quick_rid(result: dict, rid: str) -> None:
+    """Quick モードの個別要件ID表示（後方互換）。"""
+    impls = result.get("related_impl_files", {}).get(rid, [])
+    tests = result.get("related_tests", {}).get(rid, [])
+    specs = result.get("related_specs", {}).get(rid, [])
+    if impls:
+        print(f"  [{rid}] \U0001f4c4 Related code ({len(impls)}):")
+        for f in impls[:5]:
+            print(f"         {f}")
+        if len(impls) > 5:
+            print(f"         ... and {len(impls)-5} more")
+    if tests:
+        print(f"  [{rid}] \U0001f9ea Tests ({len(tests)}):")
+        for f in tests[:3]:
+            print(f"         {f}")
+        if len(tests) > 3:
+            print(f"         ... and {len(tests)-3} more")
+    if specs:
+        print(f"  [{rid}] \U0001f4dd Spec:")
+        for f in specs:
+            print(f"         {f}")
+
+
+def _print_quick_spec(result: dict) -> None:
+    """Quick モード spec→code 表示（後方互換）。"""
+    impls = result.get("impl_files", [])
+    tests = result.get("test_files", [])
+    specs = result.get("spec_files", [])
+    designs = result.get("design_files", [])
+    if impls:
+        print(f"  \U0001f4c4 Code ({len(impls)}):")
+        for f in impls[:5]:
+            print(f"    {f}")
+        if len(impls) > 5:
+            print(f"    ... and {len(impls)-5} more")
+    if tests:
+        print(f"  \U0001f9ea Tests ({len(tests)}):")
+        for f in tests[:5]:
+            print(f"    {f}")
+        if len(tests) > 5:
+            print(f"    ... and {len(tests)-5} more")
+    if specs:
+        print(f"  \U0001f4dd Spec files ({len(specs)}):")
+        for f in specs:
+            print(f"    {f}")
+    if designs:
+        print(f"  \U0001f3e0 Design references ({len(designs)}):")
+        for f in designs:
+            print(f"    {f}")
+    if not impls and not tests:
+        print(f"  \u2139\ufe0f  {result.get('note', 'no related artifacts found')}")
+
+
+def _print_std_spec(result: dict) -> None:
+    """標準モード spec→code 表示（後方互換）。"""
+    print(f"\U0001f50d Spec {result['spec_id']} \u2192 Code Impact")
+    print(f"  Files ({len(result['files'])}):")
+    for f in result["files"]:
+        print(f"    \U0001f4c4 {f}")
+    print(f"  Symbols ({len(result['symbols'])}):")
+    for s in result["symbols"]:
+        print(f"    \U0001f527 {s}")
+    print(f"  Tasks ({len(result['tasks'])}):")
+    for t in result["tasks"]:
+        print(f"    \U0001f4cb {t}")
+    print(f"  Docs ({len(result['docs'])}):")
+    for d in result["docs"]:
+        print(f"    \U0001f4dd {d}")
+    if "crg_impact" in result:
+        print("  CRG Impact:")
+        for ci in result["crg_impact"]:
+            print(f"    {ci['symbol']}: {ci['crg_result']}")
+
+
+def _print_std_code(result: dict) -> None:
+    """標準モード code→spec 表示（後方互換）。"""
+    print(f"\U0001f50d {result['file']} \u2192 Spec Impact")
+    print(f"  Requirements ({len(result['affected_requirements'])}):")
+    for r in result["affected_requirements"]:
+        print(f"    \U0001f4cb {r}")
+    print(f"  Tasks ({len(result['affected_tasks'])}):")
+    for t in result["affected_tasks"]:
+        print(f"    \U0001f4cb {t}")
+    print(f"  Design sections ({len(result['affected_design_sections'])}):")
+    for d in result["affected_design_sections"]:
+        print(f"    \U0001f4dd {d}")
+    print(f"  Spec files:")
+    for s in result["affected_specs"]:
+        print(f"    \U0001f4c4 {s}")
+
+
+def _print_std_diff(result: dict) -> None:
+    """標準モード diff 表示（後方互換）。"""
+    print(f"\U0001f50d git diff \u2192 Spec Impact")
+    print(f"  Changed files ({len(result['changed_files'])}):")
+    for f in result["changed_files"]:
+        print(f"    \U0001f4c4 {f}")
+    for r in result.get("results", []):
+        file_label = r.get("file", "unknown")
+        reqs = ", ".join(r.get("affected_requirements", []))
+        tasks = ", ".join(r.get("affected_tasks", []))
+        if reqs:
+            print(f"    {file_label}: Requirements: {reqs}")
+        if tasks:
+            print(f"    {file_label}: Tasks: {tasks}")
+
+
+def _print_rename(result: dict) -> None:
+    """Rename モード表示。"""
+    mode = " (dry-run)" if result.get("dry_run") else ""
+    print(f"\U0001f4dd Rename{mode}: {result['old_id']} \u2192 {result['new_id']}")
+    print(f"  Total: {result['total']} file(s)")
+    for ch in result.get("changes", []):
+        print(f"    \u270f\ufe0f {ch['file']}  ({ch['label']})")
+    if result.get("dry_run") and result["total"] > 0:
+        print()
+        print("  Run without --dry-run to apply changes.")
+
+
 def _print_human(result: dict):
     """人間可読な形式で出力する。"""
     if "error" in result:
@@ -587,63 +994,37 @@ def _print_human(result: dict):
 
     qtype = result.get("query_type", "")
 
-    # Quick モード出力
-    if qtype == "quick-file":
+    # ── バンドサマリー（あれば常に表示） ──
+    band_summary = result.get("band_summary")
+    if band_summary:
+        total = band_summary["green"] + band_summary["amber"] + band_summary["gray"]
+        parts = []
+        if band_summary["green"]:
+            parts.append(f"\U0001f7e2 {band_summary['green']}")
+        if band_summary["amber"]:
+            parts.append(f"\U0001f7e1 {band_summary['amber']}")
+        if band_summary["gray"]:
+            parts.append(f"\u26aa {band_summary['gray']}")
+        print(f"  Band: {'  '.join(parts)}  (total {total})")
+        print()
+
+    # ── バンド別表示 ──
+    banded = result.get("banded")
+    if banded:
+        _print_banded(banded, result.get("spec_id", ""))
+
+    # ── Quick モード（後方互換） ──
+    if qtype == "quick-file" and not banded:
         print(f"\U0001f50d Quick Impact: {result['file']}")
         print(f"  @impl tags: {', '.join(result['impl_tags'])}")
         for rid in result["impl_tags"]:
-            impls = result["related_impl_files"].get(rid, [])
-            tests = result["related_tests"].get(rid, [])
-            specs = result["related_specs"].get(rid, [])
-            if impls:
-                print(f"  [{rid}] \U0001f4c4 Related code ({len(impls)}):")
-                for f in impls[:5]:
-                    print(f"         {f}")
-                if len(impls) > 5:
-                    print(f"         ... and {len(impls)-5} more")
-            if tests:
-                print(f"  [{rid}] \U0001f9ea Tests ({len(tests)}):")
-                for f in tests[:3]:
-                    print(f"         {f}")
-                if len(tests) > 3:
-                    print(f"         ... and {len(tests)-3} more")
-            if specs:
-                print(f"  [{rid}] \U0001f4dd Spec:")
-                for f in specs:
-                    print(f"         {f}")
-        return
+            _print_quick_rid(result, rid)
 
-    if qtype == "quick-spec":
+    if qtype == "quick-spec" and not banded:
         print(f"\U0001f50d Quick Impact: spec-id {result['spec_id']}")
-        impls = result.get("impl_files", [])
-        tests = result.get("test_files", [])
-        specs = result.get("spec_files", [])
-        designs = result.get("design_files", [])
-        if impls:
-            print(f"  \U0001f4c4 Code ({len(impls)}):")
-            for f in impls[:5]:
-                print(f"    {f}")
-            if len(impls) > 5:
-                print(f"    ... and {len(impls)-5} more")
-        if tests:
-            print(f"  \U0001f9ea Tests ({len(tests)}):")
-            for f in tests[:5]:
-                print(f"    {f}")
-            if len(tests) > 5:
-                print(f"    ... and {len(tests)-5} more")
-        if specs:
-            print(f"  \U0001f4dd Spec files ({len(specs)}):")
-            for f in specs:
-                print(f"    {f}")
-        if designs:
-            print(f"  \U0001f3e0 Design references ({len(designs)}):")
-            for f in designs:
-                print(f"    {f}")
-        if not impls and not tests:
-            print(f"  \u2139\ufe0f  {result.get('note', 'no related artifacts found')}")
-        return
+        _print_quick_spec(result)
 
-    if qtype == "quick-diff":
+    if qtype == "quick-diff" and not banded:
         print(f"\U0001f50d Quick Impact: git diff")
         print(f"  Changed files ({len(result['changed_files'])}):")
         for f in result["changed_files"]:
@@ -652,67 +1033,20 @@ def _print_human(result: dict):
             if r.get("impl_tags"):
                 print(f"  \u2192 {r['file']}:")
                 print(f"     @impl tags: {', '.join(r['impl_tags'])}")
-        return
 
-    # 標準モード出力
-    if qtype == "spec\u2192code":
-        print(f"\U0001f50d Spec {result['spec_id']} \u2192 Code Impact")
-        print(f"  Files ({len(result['files'])}):")
-        for f in result["files"]:
-            print(f"    \U0001f4c4 {f}")
-        print(f"  Symbols ({len(result['symbols'])}):")
-        for s in result["symbols"]:
-            print(f"    \U0001f527 {s}")
-        print(f"  Tasks ({len(result['tasks'])}):")
-        for t in result["tasks"]:
-            print(f"    \U0001f4cb {t}")
-        print(f"  Docs ({len(result['docs'])}):")
-        for d in result["docs"]:
-            print(f"    \U0001f4dd {d}")
-        if "crg_impact" in result:
-            print("  CRG Impact:")
-            for ci in result["crg_impact"]:
-                print(f"    {ci['symbol']}: {ci['crg_result']}")
+    # ── 標準モード（後方互換） ──
+    if qtype == "spec\u2192code" and not banded:
+        _print_std_spec(result)
 
-    elif qtype == "code\u2192spec":
-        print(f"\U0001f50d {result['file']} \u2192 Spec Impact")
-        print(f"  Requirements ({len(result['affected_requirements'])}):")
-        for r in result["affected_requirements"]:
-            print(f"    \U0001f4cb {r}")
-        print(f"  Tasks ({len(result['affected_tasks'])}):")
-        for t in result["affected_tasks"]:
-            print(f"    \U0001f4cb {t}")
-        print(f"  Design sections ({len(result['affected_design_sections'])}):")
-        for d in result["affected_design_sections"]:
-            print(f"    \U0001f4dd {d}")
-        print(f"  Spec files:")
-        for s in result["affected_specs"]:
-            print(f"    \U0001f4c4 {s}")
+    elif qtype == "code\u2192spec" and not banded:
+        _print_std_code(result)
 
-    elif qtype == "diff\u2192spec":
-        print(f"\U0001f50d git diff \u2192 Spec Impact")
-        print(f"  Changed files ({len(result['changed_files'])}):")
-        for f in result["changed_files"]:
-            print(f"    \U0001f4c4 {f}")
-        for r in result.get("results", []):
-            file_label = r.get("file", "unknown")
-            reqs = ", ".join(r.get("affected_requirements", []))
-            tasks = ", ".join(r.get("affected_tasks", []))
-            if reqs:
-                print(f"    {file_label}: Requirements: {reqs}")
-            if tasks:
-                print(f"    {file_label}: Tasks: {tasks}")
+    elif qtype == "diff\u2192spec" and not banded:
+        _print_std_diff(result)
 
-    # Rename モード出力
+    # ── Rename モード ──
     if qtype == "rename":
-        mode = " (dry-run)" if result.get("dry_run") else ""
-        print(f"\U0001f4dd Rename{mode}: {result['old_id']} \u2192 {result['new_id']}")
-        print(f"  Total: {result['total']} file(s)")
-        for ch in result.get("changes", []):
-            print(f"    \u270f\ufe0f {ch['file']}  ({ch['label']})")
-        if result.get("dry_run") and result["total"] > 0:
-            print()
-            print("  Run without --dry-run to apply changes.")
+        _print_rename(result)
 
 
 def main():
@@ -729,6 +1063,9 @@ def main():
     parser.add_argument("--crg-hook", type=str, help="CRG クエリ用の外部スクリプト")
     parser.add_argument("--json", action="store_true", help="JSON 出力")
     parser.add_argument("--quick", action="store_true", help=".trace-mapping.yaml 不要の簡易モード（@impl/@spec/@verifies を grep）")
+    parser.add_argument("--band", type=str,
+                        choices=["green", "amber", "gray", "green+", "amber+"],
+                        help="バンドフィルター（green/amber/gray/green+/amber+）。指定したバンド以上の項目のみ表示")
     parser.add_argument("--project-dir", type=str, default=".",
                         help="プロジェクトルート（--quick モード用、デフォルト: カレント）")
     args = parser.parse_args()
@@ -768,11 +1105,21 @@ def main():
         if args.list:
             result = {"mapping_count": len(mappings), "mappings": mappings}
         elif args.spec_id:
-            result = impact_from_spec(mappings, args.spec_id, args.crg)
+            result = impact_from_spec(mappings, args.spec_id, args.crg, project_dir=project_dir)
         elif args.file:
-            result = impact_from_code(mappings, args.file, args.crg)
+            result = impact_from_code(mappings, args.file, args.crg, project_dir=project_dir)
         elif args.diff:
-            result = impact_from_diff(mappings, args.crg)
+            result = impact_from_diff(mappings, args.crg, project_dir=project_dir)
+
+    # --band フィルターが指定された場合、バンドで絞り込み
+    if args.band and "banded" in result:
+        filtered_files = _filter_by_band(result["banded"], args.band)
+        result["files"] = filtered_files
+        # band_summary もフィルター後の値に更新
+        filtered_summary = {"green": 0, "amber": 0, "gray": 0}
+        for band_key in filtered_summary:
+            filtered_summary[band_key] = len(result["banded"].get(band_key, []))
+        result["band_summary"] = filtered_summary
 
     if args.json:
         print(json.dumps(result, indent=2, default=str))

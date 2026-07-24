@@ -138,6 +138,48 @@ ln -sf ../../.agents/scripts/pre-commit.sh .git/hooks/pre-commit
 python3 .agents/scripts/impact.py --list
 ```
 
+### 5. 影響度バンド（Green/Amber/Gray）
+
+`impact.py` は各成果物の関連強度を3段階のバンドで分類する:
+
+```bash
+# バンド表示付きで実行（自動）
+python3 .agents/scripts/impact.py --spec-id 1.1
+
+# 特定バンド以上の項目だけ表示
+python3 .agents/scripts/impact.py --spec-id 1.1 --band green
+python3 .agents/scripts/impact.py --spec-id 1.1 --band amber+
+python3 .agents/scripts/impact.py --quick --diff --band amber+
+```
+
+| バンド | スコア | 意味 | CIでの扱い |
+|:-----:|:------:|------|:----------:|
+| 🟢 GREEN | ≥50 | .trace-mapping + @impl + テスト等の強い証拠 | 自動通過OK |
+| 🟡 AMBER | ≥20 | 一部の証拠のみ（CRG推移的、quick grep等） | 要レビュー |
+| ⚪ GRAY | <20 | 弱い一致（参考程度） | 無視可 |
+
+証拠の重み:
+
+| 証拠タイプ | 重み | 説明 |
+|-----------|:----:|------|
+| `.trace-mapping.yaml` | 40 | 設計者が明示的にリンク |
+| `@impl` タグ | 25 | 実装者がコードにタグ付け |
+| `@verifies` タグ | 20 | テストが要件を検証 |
+| CRG 直接（1 hop） | 15 | import/呼び出し関係 |
+| CRG 推移的（2+ hop） | 5 | 推移的依存 |
+| quick grep | 10 | タグベースの全文検索 |
+
+JSON出力には `banded` キーにバンド別の詳細と内訳が含まれる:
+
+```bash
+python3 .agents/scripts/impact.py --spec-id 1.1 --json | jq '.band_summary'
+# {
+#   "green": 2,
+#   "amber": 1,
+#   "gray": 0
+# }
+```
+
 ## スクリプト一覧
 
 | スクリプト | 役割 | 使用タイミング |
