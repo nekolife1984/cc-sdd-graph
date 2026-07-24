@@ -117,6 +117,18 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
   - Set `approvals.design.approved: true`
   - Update `updated_at` timestamp
 
+**Run Spec Trace Completeness Gate**:
+- If `.trace-mapping.yaml` exists, verify all spec-side traceability:
+  ```bash
+  python3 .agents/scripts/check-trace-completeness.py --check spec,design,requirements,depends --project-dir .
+  ```
+- This checks:
+  - `@spec` tags in requirements.md ↔ `.trace-mapping.yaml`
+  - `@design` / `@satisfies` tags in design.md ↔ `.trace-mapping.yaml`
+  - `_Requirements:_` in tasks.md ↔ `.trace-mapping.yaml`
+  - `_Depends:_` syntax and task ID validity
+- If the gate fails, fix the gaps and re-run until it passes
+
 **Approval**:
 - If auto-approve flag (`-y`) is provided:
   - Set `approvals.tasks.approved: true` in spec.json
@@ -150,14 +162,19 @@ Provide brief summary in the language specified in spec.json:
    - Total: X major tasks, Y sub-tasks
    - All Z requirements covered
    - Average task size: 1-3 hours per sub-task
-3. **Quality Validation**:
+3. **Trace Gate**:
+   - ✅ @spec tags in requirements.md
+   - ✅ @design/@satisfies tags in design.md
+   - ✅ _Requirements:_ in tasks.md mapped to .trace-mapping.yaml
+   - ✅ _Depends:_ syntax and task ID validity
+4. **Quality Validation**:
    - ✅ All requirements mapped to tasks
    - ✅ Design coverage and runtime prerequisites reviewed
    - ✅ Task dependencies verified
    - ✅ Task plan review gate passed
    - ✅ Independent task-graph sanity review passed
    - ✅ Testing tasks included
-4. **Next Action**: Review tasks and proceed when ready
+5. **Next Action**: Review tasks and proceed when ready
 
 **Format**: Concise (under 200 words)
 

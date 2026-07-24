@@ -142,7 +142,16 @@ Wait for completion.
 
 #### Final Sanity Review
 
-After Phase 4, run a lightweight sanity review before claiming completion.
+After Phase 4, run the spec trace completeness gate, then a lightweight sanity review before claiming completion.
+
+**Trace Completeness Gate**:
+- If `.trace-mapping.yaml` exists, verify all spec-side traceability:
+  ```bash
+  python3 .agents/scripts/check-trace-completeness.py --check spec,design,requirements,depends --project-dir .
+  ```
+- If the gate fails, fix the gaps and re-run until it passes.
+
+**Sanity Review** (after gate passes):
 
 - Review `requirements.md`, `design.md`, and `tasks.md` directly from disk. If `brief.md` exists, use it only as supporting context.
 - Prefer a fresh review sub-agent when multi-agent is available. Pass only file paths and the review objective; the reviewer should read the generated files itself.

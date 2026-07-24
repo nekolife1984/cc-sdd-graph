@@ -125,6 +125,14 @@ Output: CONSISTENT areas + ISSUES with (which specs, what's inconsistent, sugges
    - Create or append to `.trace-mapping.yaml` with basic entries (`id`, `spec`, `design`, empty `code.files`, empty `tasks`, `tags: ["@impl"]`)
    - If `.trace-mapping.yaml` exists, merge with existing entries (don't overwrite duplicate `id` values)
 
+6. **Run Spec Trace Completeness Gate**:
+   - Verify all spec-side traceability across all completed specs:
+     ```bash
+     python3 .agents/scripts/check-trace-completeness.py --check spec,design,requirements,depends --project-dir .
+     ```
+   - If the gate fails, report which specs have missing traceability tags and suggest fixes
+   - This ensures every spec's `.trace-mapping.yaml` entries have matching spec-side annotations
+
 Display final summary:
 ```
 Spec Batch Complete:

@@ -144,6 +144,14 @@ Once all research results return, synthesize in main context before proceeding.
    - Set `approvals.requirements.approved: true`
    - Update `updated_at` timestamp
 
+3. **Run @design/@satisfies Completeness Gate**:
+   - If `.trace-mapping.yaml` exists, verify `@design` and `@satisfies` tags match the mapping:
+     ```bash
+     python3 .agents/scripts/check-trace-completeness.py --check design --project-dir .
+     ```
+   - If the gate fails, fix missing `<!-- @design ComponentName -->` or `<!-- @satisfies X.Y -->` tags in design.md and re-run until it passes
+   - This ensures every component has a machine-readable design tag and declares which requirements it satisfies
+
 ## Critical Constraints
  - **Type Safety**:
    - Enforce strong typing aligned with the project's technology stack.
@@ -164,8 +172,9 @@ Provide brief summary in the language specified in spec.json:
 2. **Discovery Type**: Which discovery process was executed (full/light/minimal)
 3. **Key Findings**: 2-3 critical insights from `research.md` that shaped the design
 4. **Review Gate**: Confirm the design review gate passed
-5. **Next Action**: Approval workflow guidance (see Safety & Fallback)
+5. **Trace Gate**: Confirm `@design`/`@satisfies` completeness gate passed
 6. **Research Log**: Confirm `research.md` updated with latest decisions
+7. **Next Action**: Approval workflow guidance (see Safety & Fallback)
 
 **Format**: Concise Markdown (under 200 words) - this is the command output, NOT the design document itself
 

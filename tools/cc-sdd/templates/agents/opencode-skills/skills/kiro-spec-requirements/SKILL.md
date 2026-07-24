@@ -77,6 +77,14 @@ After all research completes, synthesize findings in main context before generat
    - Set `approvals.requirements.generated: true`
    - Update `updated_at` timestamp
 
+6. **Run @spec Completeness Gate**:
+   - If `.trace-mapping.yaml` exists, verify `@spec` tags match the mapping:
+     ```bash
+     python3 .agents/scripts/check-trace-completeness.py --check spec --project-dir .
+     ```
+   - If the gate fails, fix missing `<!-- @spec X.Y -->` tags in requirements.md and re-run until it passes
+   - This ensures each requirement ID is declared as a machine-readable `@spec` tag
+
 ## Important Constraints
 
 ### Requirements Scope: WHAT, not HOW
@@ -110,7 +118,8 @@ Provide output in the language specified in spec.json with:
 1. **Generated Requirements Summary**: Brief overview of major requirement areas (3-5 bullets)
 2. **Document Status**: Confirm requirements.md updated and spec.json metadata updated
 3. **Review Gate**: Confirm the requirements review gate passed
-4. **Next Steps**: Guide user on how to proceed (approve and continue, or modify)
+4. **Trace Gate**: Confirm `@spec` completeness gate passed (see Step 6)
+5. **Next Steps**: Guide user on how to proceed (approve and continue, or modify)
 
 **Format Requirements**:
 - Use Markdown headings for clarity
