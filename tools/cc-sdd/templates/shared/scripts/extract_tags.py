@@ -28,12 +28,15 @@ from typing import Optional
 
 
 # 対応ファイル拡張子
-EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb", ".java", ".kt", ".swift", ".md"}
+EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb",
+              ".java", ".kt", ".swift", ".md",
+              ".c", ".h", ".cpp", ".hpp", ".cs"}
 
-# タグパターン: # @impl 1.1, 1.2 | # @module auth | # @feature login
+# タグパターン: # @impl / // @impl | # @module / // @module | etc
 # HTMLコメント: <!-- @spec 1 --> <!-- @design Auth --> <!-- @satisfies 1.1, 1.2 -->
+# // コメント形式は C/C++/C# 対応
 TAG_RE = re.compile(
-    r"(?:#\s*@(?P<tag>impl|module|feature)\s+(?P<value>.+?)(?:\s*$|#))|"
+    r"(?:(?:#|//)\s*@(?P<tag>impl|module|feature|verifies)\s+(?P<value>.+?)(?:\s*$|#|//))|"
     r"(?:<!--\s*@(?P<mdtag>spec|design|satisfies)\s+(?P<mdvalue>.+?)\s*-->)",
     re.MULTILINE,
 )

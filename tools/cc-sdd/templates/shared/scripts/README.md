@@ -185,7 +185,8 @@ python3 .agents/scripts/impact.py --spec-id 1.1 --json | jq '.band_summary'
 | スクリプト | 役割 | 使用タイミング |
 |-----------|------|--------------|
 | `extract_tags.py` | コードから `@impl`/`@module`/`@feature`/`@verifies`、仕様書から `@spec`/`@design`/`@satisfies` タグを抽出 | 調査・分析時 |
-| `impact.py` | 仕様↔コードの双方向影響分析（`--quick`/`--graph`/`--serve`） | 変更前・設計レビュー時 |
+| `build-dag.py` | 軽量import依存グラフ（DAG）を構築（C/C++/C#含む17言語対応） | セットアップ時 / CI定期 |
+| `impact.py` | 仕様↔コードの双方向影響分析（`--dag` で推移的分析、`--graph`/`--serve` で可視化） | 変更前・設計レビュー時 |
 | `check_drift.py` | スナップショットベースのドリフト検出 | CI / pre-commit / cron |
 | `pre-commit.sh` | pre-commit hook（スナップショット自動更新） | コミット時 |
 | `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（9標準 + 3 P0） | 実装完了時 / CI |
@@ -222,6 +223,49 @@ python3 .agents/scripts/impact.py --quick --spec-id 2.1 --graph
 | 🔍 検索フィルター | 画面上部の検索ボックスでノードをリアルタイムフィルター |
 | 🖱️ 操作 | ドラッグで移動 / スクロールでズーム / クリックでフォーカス |
 | ⌨️ Esc | 検索クリア |
+
+## DAG 推移的影響分析（--dag）
+
+CRG(code-review-graph)がなくても、`build-dag.py` で作成した軽量importグラフを使って推移的影響分析が可能。
+
+### セットアップ
+
+```bash
+# DAGを構築（全ソースファイルのimport関係をスキャン）
+python3 .agents/scripts/build-dag.py
+
+# → .kiro/graph/dag.json が生成される
+# → 対応言語: Python, TS/JS, Go, Rust, Ruby, Java, Kotlin, Swift,
+#                C, C++, C#, Cヘッダ（17言語）
+```
+
+### 使い方
+
+```bash
+# DAGを使った推移的影響分析
+python3 .agents/scripts/impact.py --spec-id 1.1 --dag
+
+# Quickモードでも使える
+python3 .agents/scripts/impact.py --quick --spec-id 1.1 --dag
+
+# 出力例
+#   影響分析: spec-id 1.1
+#     📁 auth/login.py     ← @impl 1.1 直
+#     📁 auth/session.py   ← @impl 1.1 直
+#     🔗 DAG Transitive Impact (2 files):
+#       → auth/middleware.py  (hops=1)  ← login.py が import
+#       → db/models.py        (hops=1)  ← session.py が import
+```
+
+### CRGとの違い
+
+| 項目 | CRG (code-review-graph) | DAG (build-dag.py) |
+|:----|:------------------------|:-------------------|
+| 精度 | 高い（ASTパース） | 中（正規表現） |
+| 速度 | 遅い（フルビルド） | 速い |
+| セットアップ | `pip install` + `build` | `build-dag.py` 一発 |
+| CI負荷 | 高い | 低い |
+| 対応言語 | TS/JS/Python/Go/Rust | 17言語（C/C++/C#含む） |
 
 ## False-Green ベクター品質管理
 

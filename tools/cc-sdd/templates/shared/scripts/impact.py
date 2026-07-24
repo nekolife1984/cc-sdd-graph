@@ -64,22 +64,26 @@ TRACE_MAPPING_PATH = Path(".trace-mapping.yaml")
 
 # タグパターン（extract_tags.py と同一）
 # @impl, @verifies は数値ID（1.1, 1.2）のみ、@module/@feature は任意文字列
-IMPL_TAG_RE = re.compile(r'#\s*@impl\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
-VERIFIES_TAG_RE = re.compile(r'#\s*@verifies\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
+# # と // の両方に対応（C/C++/C# のコメント形式）
+IMPL_TAG_RE = re.compile(r'(?:#|//)\s*@impl\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
+VERIFIES_TAG_RE = re.compile(r'(?:#|//)\s*@verifies\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
 SPEC_TAG_RE = re.compile(r'<!--\s*@spec\s+(.+?)\s*-->', re.MULTILINE)
 DESIGN_TAG_RE = re.compile(r'<!--\s*@design\s+(.+?)\s*-->', re.MULTILINE)
 
 # テストファイルパターン（check-trace-completeness.py と同一）
 TEST_FILE_PATTERNS = [
-    "**/test_*.py", "**/*_test.py",
-    "**/*.test.ts", "**/*.test.tsx",
-    "**/*.spec.ts", "**/*.spec.tsx",
-    "**/*_test.go",
-    "**/*_test.rs",
-    "**/*Test*.java",
-    "**/*Test*.kt",
-    "**/*Test*.swift",
-    "**/*Test*.rb", "**/*_test.rb",
+    "**/test_*.py", "**/*_test.py",        # Python (pytest)
+    "**/*.test.ts", "**/*.test.tsx",       # TypeScript (vitest/jest)
+    "**/*.spec.ts", "**/*.spec.tsx",       # TypeScript (vitest/jest)
+    "**/*_test.go",                         # Go
+    "**/*_test.rs",                         # Rust
+    "**/*Test*.java",                       # Java (JUnit)
+    "**/*Test*.kt",                         # Kotlin
+    "**/*Test*.swift",                      # Swift (XCTest)
+    "**/*Test*.rb", "**/*_test.rb",         # Ruby (RSpec)
+    "**/test_*.c", "**/*_test.c",          # C (CUnit/Check)
+    "**/test_*.cpp", "**/*_test.cpp",      # C++ (GoogleTest/Catch2)
+    "**/*Test*.cs", "**/*Tests.cs",        # C# (NUnit/xUnit/MSTest)
 ]
 
 # 除外ディレクトリ
@@ -1020,6 +1024,15 @@ def _print_human(result: dict):
         print(f"  Band: {'  '.join(parts)}  (total {total})")
         print()
 
+    # ── DAG 推移的影響（あれば表示） ──
+    dag_transitive = result.get("dag_transitive")
+    if dag_transitive:
+        print(f"  \U0001f517 DAG Transitive Impact ({len(dag_transitive)} files):")
+        for entry in dag_transitive:
+            hops = entry.get("hops", "?")
+            print(f"    \u2192 {entry['file']}  (hops={hops})")
+        print()
+
     # ── バンド別表示 ──
     banded = result.get("banded")
     if banded:
@@ -1533,6 +1546,10 @@ def main():
                              "ファイル名指定可（デフォルト: trace-graph.html）")
     parser.add_argument("--serve", action="store_true",
                         help="対話的グラフをHTTPサーバで起動しブラウザで開く")
+    parser.add_argument("--dag", action="store_true",
+                        help="DAGファイル（.kiro/graph/dag.json）を読み込み推移的影響分析を行う。"
+                             "build-dag.py で事前にDAGを構築しておく必要あり。"
+                             "CRG(code-review-graph)がなくても推移的依存を追跡可能。")
     args = parser.parse_args()
 
     if args.crg_hook:
@@ -1575,6 +1592,47 @@ def main():
             result = impact_from_code(mappings, args.file, args.crg, project_dir=project_dir)
         elif args.diff:
             result = impact_from_diff(mappings, args.crg, project_dir=project_dir)
+
+    # --dag が指定された場合、DAGから推移的影響情報を追加
+    if args.dag:
+        dag_path = project_dir / ".kiro" / "graph" / "dag.json"
+        if dag_path.exists():
+            try:
+                dag_data = json.loads(dag_path.read_text(encoding="utf-8"))
+                spec_impact = dag_data.get("spec_impact", {})
+                # 現在の spec_id に対応する推移的情報を追加
+                current_spec = result.get("spec_id", args.spec_id or "")
+                if current_spec and current_spec in spec_impact:
+                    si = spec_impact[current_spec]
+                    result["dag"] = {
+                        "direct": si.get("direct", []),
+                        "transitive": si.get("transitive", []),
+                        "hops": si.get("hops", {}),
+                    }
+                    # 推移的ファイルを result["files"] にマージ
+                    existing = set(result.get("files", []))
+                    transitive_files = []
+                    for tf in si.get("transitive", []):
+                        if tf not in existing:
+                            transitive_files.append(tf)
+                    if transitive_files:
+                        result["files"] = list(existing) + transitive_files
+                        result["files_transitive"] = transitive_files
+                        # _print_human 用に dag_transitive 情報を追加
+                        result["dag_transitive"] = [
+                            {"file": tf, "hops": si.get("hops", {}).get(tf, "?")}
+                            for tf in transitive_files
+                        ]
+                if args.verbose:
+                    for sp_id, si in sorted(spec_impact.items()):
+                        if si.get("transitive"):
+                            print(f"  [dag] {sp_id}: direct={len(si['direct'])}, "
+                                  f"transitive={len(si['transitive'])}")
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"WARNING: Failed to load DAG: {e}", file=sys.stderr)
+        else:
+            print(f"INFO: DAG not found at {dag_path}. Run build-dag.py first.",
+                  file=sys.stderr)
 
     # --band フィルターが指定された場合、バンドで絞り込み
     if args.band and "banded" in result:

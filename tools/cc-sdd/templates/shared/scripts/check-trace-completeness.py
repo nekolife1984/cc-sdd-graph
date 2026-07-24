@@ -60,13 +60,15 @@ TRACE_MAPPING_PATH = Path(".trace-mapping.yaml")
 TASKS_MD_PATH = Path(".kiro/specs")  # 全 feature の tasks.md をスキャン
 
 # 対応ファイル拡張子
-EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb", ".java", ".kt", ".swift"}
+EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb",
+              ".java", ".kt", ".swift", ".c", ".h", ".cpp", ".hpp", ".cs"}
 
 # タグパターン（extract_tags.py と同一）
-IMPL_TAG_RE = re.compile(r'#\s*@impl\s+(.+?)(?:\s*$|#)', re.MULTILINE)
-MODULE_TAG_RE = re.compile(r'#\s*@module\s+(.+?)(?:\s*$|#)', re.MULTILINE)
-FEATURE_TAG_RE = re.compile(r'#\s*@feature\s+(.+?)(?:\s*$|#)', re.MULTILINE)
-VERIFIES_TAG_RE = re.compile(r'#\s*@verifies\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
+# # @impl / // @impl / <!-- @spec --> の全形式に対応
+IMPL_TAG_RE = re.compile(r'(?:#|//)\s*@impl\s+(.+?)(?:\s*$|#|//)', re.MULTILINE)
+MODULE_TAG_RE = re.compile(r'(?:#|//)\s*@module\s+(.+?)(?:\s*$|#|//)', re.MULTILINE)
+FEATURE_TAG_RE = re.compile(r'(?:#|//)\s*@feature\s+(.+?)(?:\s*$|#|//)', re.MULTILINE)
+VERIFIES_TAG_RE = re.compile(r'(?:#|//)\s*@verifies\s+([\d.]+(?:,\s*[\d.]+)*)', re.MULTILINE)
 
 # シンボルパターン（関数・クラス定義）
 SYMBOL_RE = re.compile(
@@ -96,11 +98,14 @@ TEST_FILE_PATTERNS = [
     "**/*.test.ts", "**/*.test.tsx",       # TypeScript (vitest/jest)
     "**/*.spec.ts", "**/*.spec.tsx",       # TypeScript (vitest/jest)
     "**/*_test.go",                         # Go
-    "**/*_test.rs", "**/*_test.rs",        # Rust
+    "**/*_test.rs",                         # Rust
     "**/*Test*.java",                       # Java (JUnit)
     "**/*Test*.kt",                         # Kotlin
     "**/*Test*.swift",                      # Swift (XCTest)
     "**/*Test*.rb", "**/*_test.rb",         # Ruby (RSpec)
+    "**/test_*.c", "**/*_test.c",          # C (CUnit/Check)
+    "**/test_*.cpp", "**/*_test.cpp",      # C++ (GoogleTest/Catch2)
+    "**/*Test*.cs", "**/*Tests.cs",        # C# (NUnit/xUnit/MSTest)
 ]
 
 
