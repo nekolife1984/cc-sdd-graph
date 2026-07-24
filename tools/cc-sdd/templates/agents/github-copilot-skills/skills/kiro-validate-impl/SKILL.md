@@ -103,6 +103,15 @@ For each detected feature:
 - If boot produces a runtime crash, unhandled exception, module-load failure, native ABI mismatch, or missing required env/config → NO-GO.
 - If no trustworthy smoke command can be identified, or the required runtime environment is unavailable → `MANUAL_VERIFY_REQUIRED`
 
+**D.5 @impl Tag Completeness**
+- Check that all `.trace-mapping.yaml` entries have corresponding `# @impl X.Y` tags in the code:
+  ```bash
+  python3 .agents/scripts/check-impl-completeness.py --project-dir <project-root>
+  ```
+- If the script fails → flag as Critical (missing traceability = features not linked to specs)
+- If `.trace-mapping.yaml` doesn't exist but the project uses cc-sdd specs → flag as Warning (traceability not configured)
+- This ensures no `@impl` tag was forgotten during implementation
+
 #### Judgment Checks (read code, compare to spec)
 
 **E. Cross-Task Integration (CRG-enhanced)**
