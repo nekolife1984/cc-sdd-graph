@@ -57,7 +57,7 @@ EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb", ".java",
 IMPL_TAG_RE = re.compile(r'#\s*@impl\s+(.+?)(?:\s*$|#)', re.MULTILINE)
 MODULE_TAG_RE = re.compile(r'#\s*@module\s+(.+?)(?:\s*$|#)', re.MULTILINE)
 FEATURE_TAG_RE = re.compile(r'#\s*@feature\s+(.+?)(?:\s*$|#)', re.MULTILINE)
-VERIFIES_TAG_RE = re.compile(r'#\s*@verifies\s+(.+?)(?:\s*$|#)', re.MULTILINE)
+VERIFIES_TAG_RE = re.compile(r'#\s*@verifies\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
 
 # シンボルパターン（関数・クラス定義）
 SYMBOL_RE = re.compile(
@@ -627,8 +627,8 @@ def main():
     if args.list_checks:
         print("利用可能なチェック:")
         for name, func in sorted(AVAILABLE_CHECKS.items()):
-            doc_line = func.__doc__ or ""
-            brief = doc_line.split("\n")[0] if doc_line else ""
+            doc = (func.__doc__ or "").strip()
+            brief = doc.split("\n")[0] if doc else ""
             print(f"  {name:15s} — {brief}")
         sys.exit(0)
 

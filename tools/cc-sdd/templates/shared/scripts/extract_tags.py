@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-'extract_tags.py — コードから @impl/@module/@feature タグ、'
-DOCSTRING = """extract_tags.py - コードから @impl/@module/@feature タグ、仕様書から @spec/@design/@satisfies タグを抽出する。
+DOCSTRING = """extract_tags.py - extract tags from code and spec documents.
 
 Usage:
   python3 .agents/scripts/extract_tags.py --dir strands-chat/

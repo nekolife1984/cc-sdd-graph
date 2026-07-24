@@ -42,8 +42,9 @@ import yaml
 TRACE_MAPPING_PATH = Path(".trace-mapping.yaml")
 
 # タグパターン（extract_tags.py と同一）
-IMPL_TAG_RE = re.compile(r'#\s*@impl\s+(.+?)(?:\s*$|#)', re.MULTILINE)
-VERIFIES_TAG_RE = re.compile(r'#\s*@verifies\s+(.+?)(?:\s*$|#)', re.MULTILINE)
+# @impl, @verifies は数値ID（1.1, 1.2）のみ、@module/@feature は任意文字列
+IMPL_TAG_RE = re.compile(r'#\s*@impl\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
+VERIFIES_TAG_RE = re.compile(r'#\s*@verifies\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
 SPEC_TAG_RE = re.compile(r'<!--\s*@spec\s+(.+?)\s*-->', re.MULTILINE)
 DESIGN_TAG_RE = re.compile(r'<!--\s*@design\s+(.+?)\s*-->', re.MULTILINE)
 
