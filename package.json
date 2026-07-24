@@ -3,7 +3,7 @@
   "version": "3.0.2",
   "description": "Spec-driven SDLC with code-review-graph traceability",
   "bin": {
-    "cc-sdd-graph": "./tools/cc-sdd/dist/cli.js"
+    "cc-sdd-graph": "./bin/cc-sdd-graph.js"
   },
   "scripts": {
     "postinstall": "cd tools/cc-sdd && npm install && npm run build"
