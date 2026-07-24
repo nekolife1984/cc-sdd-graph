@@ -39,6 +39,8 @@ Checks:
   10. coverage   — @impl タグ行のカバレッジ実行確認（行レベル、coverage.json/.coverage/LCOV対応）
   11. assertions — @verifies ファイルの実アサーション有無
   12. stale      — .trace-mapping.yaml 参照ファイルの鮮度（90日ルール）
+  P1 false-green ベクターチェック:
+  13. cross-lang — 言語間の @impl タグ一貫性
 """
 
 import argparse
@@ -970,6 +972,72 @@ def _parse_lcov(lcov_path: Path, out: dict[str, set[int]]) -> None:
             current_file = None
 
 
+def check_cross_language_tags(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    P1-3: 言語間で @impl タグの要件IDが一貫しているか
+    - 同じ要件IDが一部の言語でのみ使われ、別の言語では使われていない場合に警告
+    - プロジェクトに複数言語が存在することが前提
+    """
+    issues = []
+    LANG_EXT = {
+        ".py": "Python",
+        ".ts": "TypeScript", ".tsx": "TypeScript",
+        ".js": "JavaScript", ".jsx": "JavaScript",
+        ".go": "Go",
+        ".rs": "Rust",
+        ".rb": "Ruby",
+        ".java": "Java",
+        ".kt": "Kotlin",
+        ".swift": "Swift",
+        ".c": "C", ".h": "C",
+        ".cpp": "C++", ".hpp": "C++",
+        ".cs": "C#",
+    }
+
+    lang_impls: dict[str, dict[str, list[str]]] = {}
+    present_langs: set[str] = set()
+
+    for ext, lang in LANG_EXT.items():
+        for fpath in sorted(project_dir.rglob(f"*{ext}")):
+            if any(part in (".venv", "node_modules", ".git", "dist", "build", "__pycache__")
+                   for part in fpath.parts):
+                continue
+            try:
+                content = fpath.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for match in IMPL_TAG_RE.finditer(content):
+                values = [v.strip() for v in match.group(1).replace("，", ",").split(",") if v.strip()]
+                for val in values:
+                    lang_impls.setdefault(lang, {}).setdefault(val, []).append(str(fpath))
+                    present_langs.add(lang)
+
+    if len(present_langs) < 2:
+        return []
+
+    all_req_ids: set[str] = set()
+    for lang_data in lang_impls.values():
+        all_req_ids.update(lang_data.keys())
+
+    for req_id in sorted(all_req_ids):
+        langs_with = [lang for lang in sorted(present_langs)
+                      if req_id in lang_impls.get(lang, {})]
+        langs_without = [lang for lang in sorted(present_langs)
+                         if lang not in langs_with]
+
+        if langs_without:
+            lang_list_with = ", ".join(
+                f"{l}({len(lang_impls[l][req_id])})" for l in langs_with
+            )
+            lang_list_without = ", ".join(langs_without)
+            issues.append(
+                f"[cross-lang] @impl {req_id}: {lang_list_with} にあるが、"
+                f"{lang_list_without} には見つからない"
+            )
+
+    return issues
+
+
 AVAILABLE_CHECKS = {
     "impl": check_impl_completeness,
     "files": check_files_existence,
@@ -984,6 +1052,8 @@ AVAILABLE_CHECKS = {
     "coverage": check_coverage_impl,
     "assertions": check_assertions_in_verifies,
     "stale": check_mapping_freshness,
+    # P1 false-green ベクターチェック
+    "cross-lang": check_cross_language_tags,
 }
 
 
