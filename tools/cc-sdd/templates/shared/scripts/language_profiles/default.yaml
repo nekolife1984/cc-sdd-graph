@@ -1,0 +1,83 @@
+# cc-sdd-graph Language Profile
+# ==============================
+# 対応言語とパターンの定義。
+# カスタムプロファイルを作成するには:
+#   1. このファイルを .kiro/profiles/custom.yaml にコピー
+#   2. 必要な言語を追加・編集
+#   3. .agents/scripts/language_profiles/ に配置すると自動読み込み
+#
+# 注: import/require/include パターンは複雑なため各スクリプトにハードコード。
+#     拡張子とテストパターンのみこのファイルで管理。
+
+version: 2
+
+builtin:
+  # 対応ファイル拡張子と言語名
+  # @impl タグのスキャン対象となる言語を定義する
+  extensions:
+    .py: Python
+    .ts: TypeScript
+    .tsx: TypeScript
+    .js: JavaScript
+    .jsx: JavaScript
+    .go: Go
+    .rs: Rust
+    .rb: Ruby
+    .java: Java
+    .kt: Kotlin
+    .swift: Swift
+    .c: C
+    .h: C
+    .cpp: C++
+    .hpp: C++
+    .cs: C#
+
+  # コメント記号（@impl タグのパースに使う）
+  # ここに追加した記号は IMPL_TAG_RE の OR 条件に追加される
+  comment_styles:
+    - "#"
+    - "//"
+
+  # テストファイルパターン（glob）
+  # テストファイルを検出し @verifies タグをスキャンする
+  test_file_patterns:
+    - "**/test_*.py"
+    - "**/*_test.py"
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.spec.ts"
+    - "**/*.spec.tsx"
+    - "**/*_test.go"
+    - "**/*_test.rs"
+    - "**/*Test*.java"
+    - "**/*Test*.kt"
+    - "**/*Test*.swift"
+    - "**/*Test*.rb"
+    - "**/*_test.rb"
+    - "**/test_*.c"
+    - "**/*_test.c"
+    - "**/test_*.cpp"
+    - "**/*_test.cpp"
+    - "**/*Test*.cs"
+    - "**/*Tests.cs"
+
+  # 除外ディレクトリ（glob）
+  exclude_dirs:
+    - .git
+    - node_modules
+    - .venv
+    - __pycache__
+    - dist
+    - build
+    - .artgraph
+    - .trace
+    - .kiro
+    - bin
+    - obj
+    - .vs
+    - packages
+    - coverage
+    - htmlcov
+    - .tox
+    - vendor
+    - third_party

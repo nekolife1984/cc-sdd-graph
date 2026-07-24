@@ -62,32 +62,35 @@ import yaml
 
 TRACE_MAPPING_PATH = Path(".trace-mapping.yaml")
 
+# 言語プロファイルを読み込み
+try:
+    from language_profiles import get_extensions, get_test_patterns, get_exclude_dirs
+    EXTENSIONS = get_extensions()
+    TEST_FILE_PATTERNS = get_test_patterns()
+    EXCLUDE_DIRS = get_exclude_dirs()
+except ImportError:
+    EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb",
+                  ".java", ".kt", ".swift", ".c", ".h", ".cpp", ".hpp", ".cs"}
+    TEST_FILE_PATTERNS = [
+        "**/test_*.py", "**/*_test.py",
+        "**/*.test.ts", "**/*.test.tsx",
+        "**/*.spec.ts", "**/*.spec.tsx",
+        "**/*_test.go", "**/*_test.rs",
+        "**/*Test*.java", "**/*Test*.kt", "**/*Test*.swift",
+        "**/*Test*.rb", "**/*_test.rb",
+        "**/test_*.c", "**/*_test.c",
+        "**/test_*.cpp", "**/*_test.cpp",
+        "**/*Test*.cs", "**/*Tests.cs",
+    ]
+    EXCLUDE_DIRS = {".git", "node_modules", ".venv", "__pycache__", "dist",
+                    "build", ".artgraph", ".trace", ".kiro"}
+
 # タグパターン（extract_tags.py と同一）
-# @impl, @verifies は数値ID（1.1, 1.2）のみ、@module/@feature は任意文字列
-# # と // の両方に対応（C/C++/C# のコメント形式）
 IMPL_TAG_RE = re.compile(r'(?:#|//)\s*@impl\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
 VERIFIES_TAG_RE = re.compile(r'(?:#|//)\s*@verifies\s+([\d.]+(?:\s*,\s*[\d.]+)*)', re.MULTILINE)
 SPEC_TAG_RE = re.compile(r'<!--\s*@spec\s+(.+?)\s*-->', re.MULTILINE)
 DESIGN_TAG_RE = re.compile(r'<!--\s*@design\s+(.+?)\s*-->', re.MULTILINE)
 
-# テストファイルパターン（check-trace-completeness.py と同一）
-TEST_FILE_PATTERNS = [
-    "**/test_*.py", "**/*_test.py",        # Python (pytest)
-    "**/*.test.ts", "**/*.test.tsx",       # TypeScript (vitest/jest)
-    "**/*.spec.ts", "**/*.spec.tsx",       # TypeScript (vitest/jest)
-    "**/*_test.go",                         # Go
-    "**/*_test.rs",                         # Rust
-    "**/*Test*.java",                       # Java (JUnit)
-    "**/*Test*.kt",                         # Kotlin
-    "**/*Test*.swift",                      # Swift (XCTest)
-    "**/*Test*.rb", "**/*_test.rb",         # Ruby (RSpec)
-    "**/test_*.c", "**/*_test.c",          # C (CUnit/Check)
-    "**/test_*.cpp", "**/*_test.cpp",      # C++ (GoogleTest/Catch2)
-    "**/*Test*.cs", "**/*Tests.cs",        # C# (NUnit/xUnit/MSTest)
-]
-
-# 除外ディレクトリ
-EXCLUDE_DIRS = {".git", "node_modules", ".venv", "__pycache__", "dist", "build", ".artgraph", ".trace"}
 
 # ── 影響度バンド（Green/Amber/Gray） ──
 # 証拠タイプごとの重み

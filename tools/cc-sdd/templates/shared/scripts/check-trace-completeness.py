@@ -63,11 +63,30 @@ except ImportError:
 
 # ── 定数 ──
 TRACE_MAPPING_PATH = Path(".trace-mapping.yaml")
-TASKS_MD_PATH = Path(".kiro/specs")  # 全 feature の tasks.md をスキャン
+TASKS_MD_PATH = Path(".kiro/specs")
 
-# 対応ファイル拡張子
-EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb",
-              ".java", ".kt", ".swift", ".c", ".h", ".cpp", ".hpp", ".cs"}
+# 言語プロファイルを読み込み
+try:
+    from language_profiles import get_extensions, get_test_patterns, get_exclude_dirs
+    EXTENSIONS = get_extensions()
+    TEST_FILE_PATTERNS = get_test_patterns()
+    EXCLUDE_DIRS = get_exclude_dirs()
+except ImportError:
+    EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb",
+                  ".java", ".kt", ".swift", ".c", ".h", ".cpp", ".hpp", ".cs"}
+    TEST_FILE_PATTERNS = [
+        "**/test_*.py", "**/*_test.py",
+        "**/*.test.ts", "**/*.test.tsx",
+        "**/*.spec.ts", "**/*.spec.tsx",
+        "**/*_test.go", "**/*_test.rs",
+        "**/*Test*.java", "**/*Test*.kt", "**/*Test*.swift",
+        "**/*Test*.rb", "**/*_test.rb",
+        "**/test_*.c", "**/*_test.c",
+        "**/test_*.cpp", "**/*_test.cpp",
+        "**/*Test*.cs", "**/*Tests.cs",
+    ]
+    EXCLUDE_DIRS = {".git", "node_modules", ".venv", "__pycache__", "dist",
+                    "build", ".artgraph", ".trace", ".kiro"}
 
 # タグパターン（extract_tags.py と同一）
 # # @impl / // @impl / <!-- @spec --> の全形式に対応
@@ -98,21 +117,8 @@ SPEC_TAG_RE = re.compile(r'<!--\s*@spec\s+(.+?)\s*-->', re.MULTILINE)
 DESIGN_TAG_RE = re.compile(r'<!--\s*@design\s+(.+?)\s*-->', re.MULTILINE)
 SATISFIES_TAG_RE = re.compile(r'<!--\s*@satisfies\s+(.+?)\s*-->', re.MULTILINE)
 
-# テストファイルパターン（全言語対応）
-TEST_FILE_PATTERNS = [
-    "**/test_*.py", "**/*_test.py",        # Python (pytest)
-    "**/*.test.ts", "**/*.test.tsx",       # TypeScript (vitest/jest)
-    "**/*.spec.ts", "**/*.spec.tsx",       # TypeScript (vitest/jest)
-    "**/*_test.go",                         # Go
-    "**/*_test.rs",                         # Rust
-    "**/*Test*.java",                       # Java (JUnit)
-    "**/*Test*.kt",                         # Kotlin
-    "**/*Test*.swift",                      # Swift (XCTest)
-    "**/*Test*.rb", "**/*_test.rb",         # Ruby (RSpec)
-    "**/test_*.c", "**/*_test.c",          # C (CUnit/Check)
-    "**/test_*.cpp", "**/*_test.cpp",      # C++ (GoogleTest/Catch2)
-    "**/*Test*.cs", "**/*Tests.cs",        # C# (NUnit/xUnit/MSTest)
-]
+
+
 
 
 # ── ユーティリティ ──
