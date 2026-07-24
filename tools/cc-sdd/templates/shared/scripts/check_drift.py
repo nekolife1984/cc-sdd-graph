@@ -2,10 +2,19 @@
 """check_drift.py — コードと仕様書の間のドリフト（乖離）を検出する。
 
 スナップショットベースで動作し、コードの @impl タグと .trace-mapping.yaml を比較する。
+reconciliation_ledger（設計判断台帳）にも対応。
 
 Usage:
   # 現在の状態のスナップショットを保存
   python3 .agents/scripts/check_drift.py --snapshot
+
+  # 理由付きでスナップショット保存（台帳に記録）
+  python3 .agents/scripts/check_drift.py --snapshot --reason "ログイン機能を追加"
+
+  # 設計判断台帳を表示
+  python3 .agents/scripts/check_drift.py --ledger
+  python3 .agents/scripts/check_drift.py --ledger --ledger-id "2026-07-25-001"
+  python3 .agents/scripts/check_drift.py --ledger --ledger-limit 5
 
   # 現在の状態とスナップショットを比較（ドリフト検出）
   python3 .agents/scripts/check_drift.py --check
@@ -32,9 +41,10 @@ from typing import Any, Optional
 
 import yaml
 
-
+# 定数
 TRACE_MAPPING_PATH = Path(".trace-mapping.yaml")
 SNAPSHOT_PATH = Path(".trace-snapshot.json")
+LEDGER_PATH = Path(".kiro/reconciliation_ledger.yaml")
 
 # このスクリプト自身のディレクトリ（.agents/scripts/）は extract_tags.py と同じ
 _SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -231,13 +241,20 @@ def check_diff(base: Optional[str] = None, gate: bool = False) -> list[dict]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="コードと仕様書のドリフト検出")
+    parser = argparse.ArgumentParser(description="コードと仕様書のドリフト検出 + 設計判断台帳")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--snapshot", action="store_true", help="現在の状態のスナップショットを保存")
     group.add_argument("--check", action="store_true", help="現在の状態とスナップショットを比較")
     group.add_argument("--diff", action="store_true", help="git diff ベースでドリフト検出")
+    group.add_argument("--ledger", action="store_true", help="設計判断台帳（reconciliation ledger）を表示")
     parser.add_argument("--base", type=str, help="差分比較のベースブランチ（--diff と併用）")
     parser.add_argument("--gate", action="store_true", help="CI ゲートモード（--diff と併用、ドリフトあり → exit 1）")
+    parser.add_argument("--reason", type=str, default="",
+                        help="スナップショット保存時の理由（--snapshot と併用、台帳に記録）")
+    parser.add_argument("--ledger-id", type=str, default="",
+                        help="台帳の特定エントリを表示（--ledger と併用）")
+    parser.add_argument("--ledger-limit", type=int, default=10,
+                        help="台帳の表示件数（--ledger と併用、デフォルト: 10）")
     args = parser.parse_args()
 
     mappings = load_mapping()
@@ -247,6 +264,10 @@ def main():
     if args.snapshot:
         snapshot = build_snapshot(mappings)
         save_snapshot(snapshot)
+        # 台帳に記録
+        _append_ledger_entry(snapshot, args.reason)
+        if args.reason:
+            print(f"   Reason: {args.reason}")
         sys.exit(0)
 
     if args.check:
@@ -273,6 +294,105 @@ def main():
         else:
             print("✅ No spec-impacting changes detected.")
         sys.exit(0)
+
+    if args.ledger:
+        _show_ledger(args.ledger_id, args.ledger_limit)
+        sys.exit(0)
+
+
+def _append_ledger_entry(snapshot: dict, reason: str = "") -> None:
+    """スナップショット保存時に reconciliation ledger にエントリを追記する。"""
+    import uuid
+
+    entries = []
+    if LEDGER_PATH.exists():
+        try:
+            data = yaml.safe_load(LEDGER_PATH.read_text(encoding="utf-8"))
+            if data and "entries" in data:
+                entries = data["entries"]
+        except Exception:
+            entries = []
+
+    # git 情報を取得
+    commit_hash = ""
+    commit_msg = ""
+    author = ""
+    try:
+        commit_hash = subprocess.run(
+            ["git", "log", "-1", "--format=%H"], capture_output=True,
+            text=True, check=True, cwd=LEDGER_PATH.parent,
+        ).stdout.strip()
+        commit_msg = subprocess.run(
+            ["git", "log", "-1", "--format=%s"], capture_output=True,
+            text=True, check=True, cwd=LEDGER_PATH.parent,
+        ).stdout.strip()[:80]
+        author = subprocess.run(
+            ["git", "log", "-1", "--format=%an"], capture_output=True,
+            text=True, check=True, cwd=LEDGER_PATH.parent,
+        ).stdout.strip()
+    except Exception:
+        pass
+
+    entry_id = f"ledger-{datetime.now().strftime('%Y%m%d')}-{len(entries) + 1:03d}"
+    entry = {
+        "id": entry_id,
+        "timestamp": datetime.now().isoformat(),
+        "type": "snapshot",
+        "files_count": len(snapshot.get("files", [])),
+        "tags_count": len(snapshot.get("tag_entries", [])),
+        "reason": reason or "定期スナップショット",
+        "author": author or "unknown",
+        "commit": commit_hash,
+        "commit_message": commit_msg,
+    }
+    entries.append(entry)
+
+    LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LEDGER_PATH.write_text(
+        yaml.dump({"entries": entries}, default_flow_style=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+
+def _show_ledger(entry_id: str = "", limit: int = 10) -> None:
+    """reconciliation ledger を表示する。"""
+    if not LEDGER_PATH.exists():
+        print("📒 reconciliation ledger が見つかりません")
+        print(f"   場所: {LEDGER_PATH}")
+        print("   最初のスナップショットを --reason 付きで保存すると作成されます")
+        return
+
+    try:
+        data = yaml.safe_load(LEDGER_PATH.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"ERROR: 台帳の読み込みに失敗: {e}", file=sys.stderr)
+        return
+
+    entries = data.get("entries", []) if data else []
+
+    if entry_id:
+        entries = [e for e in entries if e.get("id") == entry_id]
+        if not entries:
+            print(f"エントリ '{entry_id}' が見つかりません")
+            return
+
+    entries = entries[-limit:]  # 最新N件
+    entries.reverse()  # 新しい順
+
+    print(f"📒 Reconciliation Ledger ({len(entries)} entries)\n")
+    for e in entries:
+        eid = e.get("id", "?")
+        ts = e.get("timestamp", "?")[:19]
+        reason = e.get("reason", "")
+        author = e.get("author", "?")
+        commit = e.get("commit", "")[:12]
+        files_n = e.get("files_count", "?")
+        tags_n = e.get("tags_count", "?")
+        print(f"  [{eid}] {ts}")
+        print(f"        Reason: {reason}")
+        print(f"        Author: {author}  Commit: {commit}")
+        print(f"        Files: {files_n}  Tags: {tags_n}")
+        print()
 
 
 if __name__ == "__main__":
