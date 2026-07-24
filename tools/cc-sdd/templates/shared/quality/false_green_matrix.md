@@ -8,7 +8,7 @@ cc-sdd-graph の検証器（verifier）強靭化状況を示すマトリクス�
 
 | Vector | Pri | Owner Gate | Status | Detection | Check CLI |
 |--------|:---:|:----------:|:------:|:---------:|-----------|
-| impl_tag_orphan | P0 | No | planned | missed_green | `--check-coverage` |
+| impl_tag_orphan | P0 | No | **shipped** | **caught_amber** | `--check coverage` |
 | verifies_empty_assert | P0 | No | **shipped** | **caught_amber** | `--check assertions` |
 | mapping_stale | P0 | No | **shipped** | **caught_amber** | `--check stale` |
 | ci_gate_bypassed | P0 | Yes | planned | missed_green | (外部監視) |
@@ -24,8 +24,8 @@ cc-sdd-graph の検証器（verifier）強靭化状況を示すマトリクス�
 
 | 条件 | 状態 |
 |------|:----:|
-| 4-fixture 完備（green_control / false_green_candidate / false_red_guard / legacy_backcompat） | 🟡 一部対応: assertions(10), stale(10) のみ |
-| P0 kill rate 100%（caught_red または caught_amber） | 🟡 2/4 shipped（assertions, stale） |
+| 4-fixture 完備 | 🟡 ガイド作成済み（`quality/4-fixtures-guide.md`） |
+| P0 kill rate 100%（caught_red または caught_amber） | 🟡 **3/4 shipped**（coverage, assertions, stale） |
 | P1 kill rate ≥95% | 🔴 未着手 |
 | control/legacy false-red = 0 | 🟡 未検証 |
 | 連続2回の discovery で新規 missed_green なし | 🔴 未着手 |

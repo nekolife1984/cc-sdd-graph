@@ -209,18 +209,27 @@ cp -r tools/cc-sdd/templates/shared/quality/ .kiro/quality/
 `check-trace-completeness.py` に組み込み済み:
 
 ```bash
+# @impl コードのカバレッジ確認（coverage.json または .coverage が必要）
+python3 .agents/scripts/check-trace-completeness.py --check coverage
+
 # @verifies ファイルの実アサーションチェック
 python3 .agents/scripts/check-trace-completeness.py --check assertions
 
 # .trace-mapping.yaml 参照コードの鮮度チェック（90日ルール）
 python3 .agents/scripts/check-trace-completeness.py --check stale
 
-# CI/CD で全チェックと一緒に実行
-python3 .agents/scripts/check-trace-completeness.py --check assertions,stale
+# CI/CD で全P0チェックと一緒に実行
+python3 .agents/scripts/check-trace-completeness.py --check coverage,assertions,stale
 
-# 鮮度閾値のカスタマイズ（環境変数）
-TRACE_STALE_DAYS=180 python3 .agents/scripts/check-trace-completeness.py --check stale
+# または一発ゲート
+bash .agents/scripts/check-gate.sh
 ```
+
+| チェック | ベクター | 検出ロジック | 準備 |
+|---------|:--------:|-------------|------|
+| `coverage` | P0-1 @impl orphan | @impl ファイルが coverage.json/.coverage にヒットしているか | `pytest --cov --cov-report=json` |
+| `assertions` | P0-2 空アサーション | @verifies ファイルに assert/expect/should があるか | なし（静的解析） |
+| `stale` | P0-3 stale mapping | 参照コードが90日以上未変更か | git 管理下であること |
 
 ## よくある使い方
 

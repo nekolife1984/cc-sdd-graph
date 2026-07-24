@@ -36,8 +36,9 @@ Checks:
   9. test      — @verifies ↔ .trace-mapping.yaml 完全性（テストファイル）
 
   P0 false-green ベクターチェック:
-  10. assertions — @verifies ファイルの実アサーション有無
-  11. stale      — .trace-mapping.yaml 参照ファイルの鮮度（90日ルール）
+  10. coverage   — @impl ファイルのカバレッジ実行確認
+  11. assertions — @verifies ファイルの実アサーション有無
+  12. stale      — .trace-mapping.yaml 参照ファイルの鮮度（90日ルール）
 """
 
 import argparse
@@ -747,6 +748,108 @@ def check_mapping_freshness(project_dir: Path, mappings: list[dict]) -> list[str
 
     return issues
 
+
+def check_coverage_impl(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    P0-1: @impl タグコードがカバレッジで実行されているか
+    - 既存のカバレッジレポートを読み込み（coverage.json / .coverage）
+    - @impl タグのある各ファイルが coverage で hit されているか確認
+    - カバレッジデータがない場合はスキップ＋警告
+    """
+    issues = []
+
+    # @impl ファイルを収集
+    impl_files: dict[str, Path] = {}
+    for ext in EXTENSIONS:
+        for fpath in sorted(project_dir.rglob(f"*{ext}")):
+            if any(part in (".venv", "node_modules", ".git", "dist", "build", "__pycache__")
+                   for part in fpath.parts):
+                continue
+            try:
+                content = fpath.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            if IMPL_TAG_RE.search(content):
+                rel = str(fpath.relative_to(project_dir))
+                impl_files[rel] = fpath
+
+    if not impl_files:
+        return []
+
+    # カバレッジデータを探す
+    coverage_data: set[str] = set()  # hit されたファイルパス（相対）
+    coverage_source = None
+
+    # 1) coverage.json（--cov-json / pytest-cov JSON 出力）
+    cov_json_paths = [
+        project_dir / "coverage.json",
+        project_dir / "coverage/coverage.json",
+    ]
+    for cpath in cov_json_paths:
+        if cpath.exists():
+            try:
+                import json
+                data = json.loads(cpath.read_text(encoding="utf-8"))
+                files_section = data.get("files", data)
+                for filepath, file_data in files_section.items():
+                    if isinstance(file_data, dict):
+                        summary = file_data.get("summary", file_data)
+                        covered = summary.get("covered_lines", summary.get("covered", 0))
+                        if covered and covered > 0:
+                            coverage_data.add(filepath)
+                coverage_source = str(cpath.relative_to(project_dir))
+                break
+            except Exception:
+                continue
+
+    # 2) .coverage（SQLite 形式）
+    if not coverage_source:
+        dot_coverage = project_dir / ".coverage"
+        if dot_coverage.exists():
+            try:
+                import coverage as cov_mod
+                cov = cov_mod.Coverage(data_file=str(dot_coverage))
+                cov.load()
+                data = cov.get_data()
+                for filepath in data.measured_files():
+                    try:
+                        rel_fp = str(Path(filepath).relative_to(project_dir))
+                        coverage_data.add(rel_fp)
+                    except ValueError:
+                        coverage_data.add(filepath)
+                coverage_source = ".coverage"
+            except ImportError:
+                issues.append(
+                    "[coverage] .coverage が見つかりましたが、coverage パッケージが"
+                    "インストールされていません（pip install coverage）"
+                )
+            except Exception:
+                pass
+
+    # 3) カバレッジデータなし → 情報提供
+    if not coverage_source:
+        issues.append(
+            f"[coverage] カバレッジデータが見つかりません — "
+            f"@impl ファイル {len(impl_files)} 件のカバレッジ未確認"
+        )
+        issues.append(
+            "[coverage] 実行方法: pytest --cov --cov-report=json -q 2>/dev/null"
+        )
+        return issues
+
+    # 各 @impl ファイルが coverage に含まれているか
+    for rel, fpath in sorted(impl_files.items()):
+        if rel not in coverage_data:
+            resolved = str(fpath.resolve())
+            if resolved not in coverage_data:
+                issues.append(
+                    f"[coverage] @impl ファイル '{rel}' がカバレッジ実行で"
+                    f"ヒットしていない（{coverage_source}）"
+                )
+
+    return issues
+
+
 AVAILABLE_CHECKS = {
     "impl": check_impl_completeness,
     "files": check_files_existence,
@@ -758,6 +861,7 @@ AVAILABLE_CHECKS = {
     "design": check_design_tags,
     "test": check_test_trace,
     # P0 false-green ベクターチェック
+    "coverage": check_coverage_impl,
     "assertions": check_assertions_in_verifies,
     "stale": check_mapping_freshness,
 }
