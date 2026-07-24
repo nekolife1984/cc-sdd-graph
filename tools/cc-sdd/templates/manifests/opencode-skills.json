@@ -28,6 +28,14 @@
         "toDir": "{{KIRO_DIR}}/settings/templates"
       },
       "when": { "agent": "opencode-skills" }
+    },
+    {
+      "id": "traceability_scripts",
+      "source": {
+        "type": "templateDir",
+        "fromDir": "templates/shared/scripts",
+        "toDir": ".agents/scripts"
+      }
     }
   ]
 }

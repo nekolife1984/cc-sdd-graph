@@ -52,6 +52,7 @@ describe('real windsurf-skills manifest', () => {
     expect(out).toMatch(/Plan \(dry-run\)/);
     expect(out).toContain('[templateDir] skills: templates/agents/windsurf-skills/skills -> .windsurf/skills');
     expect(out).toContain('[templateFile] doc_main: templates/agents/windsurf-skills/docs/AGENTS.md -> ./AGENTS.md');
+    expect(out).toContain('[templateDir] traceability_scripts: templates/shared/scripts -> .agents/scripts');
     expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/en/templates -> .kiro/settings/templates');
   });
 

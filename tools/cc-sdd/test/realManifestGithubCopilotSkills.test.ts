@@ -52,6 +52,7 @@ describe('real github-copilot-skills manifest', () => {
     expect(out).toMatch(/Plan \(dry-run\)/);
     expect(out).toContain('[templateDir] skills: templates/agents/github-copilot-skills/skills -> .github/skills');
     expect(out).toContain('[templateFile] doc_main: templates/agents/github-copilot-skills/docs/AGENTS.md -> ./AGENTS.md');
+    expect(out).toContain('[templateDir] traceability_scripts: templates/shared/scripts -> .agents/scripts');
     expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/en/templates -> .kiro/settings/templates');
   });
 
