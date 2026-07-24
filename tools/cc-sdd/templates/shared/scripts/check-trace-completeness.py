@@ -4,6 +4,7 @@ check-trace-completeness.py — トレーサビリティ完全性チェック
 
 コード内の @impl/@module/@feature タグと .trace-mapping.yaml,
 tasks.md の一貫性を検証する包括的ゲート。
+False-Green ベクターチェック（P0）を含む。
 
 Usage:
   # 全チェック実行
@@ -11,6 +12,9 @@ Usage:
 
   # 特定のチェックのみ
   python3 .agents/scripts/check-trace-completeness.py --check impl,files,symbols,module,requirements,depends,spec,design
+
+  # P0 false-green ベクターチェック
+  python3 .agents/scripts/check-trace-completeness.py --check assertions,stale
 
   # プロジェクトディレクトリを指定
   python3 .agents/scripts/check-trace-completeness.py --project-dir /path/to/project
@@ -30,6 +34,10 @@ Checks:
   7. spec      — @spec ↔ .trace-mapping.yaml 完全性（requirements.md）
   8. design    — @design + @satisfies ↔ .trace-mapping.yaml 完全性（design.md）
   9. test      — @verifies ↔ .trace-mapping.yaml 完全性（テストファイル）
+
+  P0 false-green ベクターチェック:
+  10. assertions — @verifies ファイルの実アサーション有無
+  11. stale      — .trace-mapping.yaml 参照ファイルの鮮度（90日ルール）
 """
 
 import argparse
@@ -596,7 +604,148 @@ def check_test_trace(project_dir: Path, mappings: list[dict]) -> list[str]:
     return issues
 
 
-# ── メイン ──
+# ── False-Green ベクターチェック（P0） ──
+
+
+def check_assertions_in_verifies(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    P0-2: @verifies ファイルに実アサーションがあるか
+    - @verifies タグがあるテストファイルが実質的なアサーション
+      （assert/expect/should/require/verify）を含んでいるか
+    - 注意: チェックは構文ベースで、アサーションの正しさは検証しない
+    """
+    issues = []
+    verifies_files: set[Path] = set()
+
+    # @verifies タグを持つファイルを収集
+    for pattern in TEST_FILE_PATTERNS:
+        for fpath in sorted(project_dir.glob(pattern)):
+            try:
+                content = fpath.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            if VERIFIES_TAG_RE.search(content):
+                verifies_files.add(fpath)
+
+    if not verifies_files:
+        return []
+
+    # アサーションパターン（言語横断）
+    ASSERTION_PATTERNS = re.compile(
+        r'\b(?:'
+        r'assert\b|'                     # Python, Go, Rust
+        r'\.(?:toEq|toEqual|toBe|toContain|toHaveLength|toMatchObject|'
+        r'toStrictEqual|toBeTruthy|toBeFalsy|toBeNull|toBeDefined|'
+        r'toThrow|toThrowError)\s*\(|'   # Jest/Vitest
+        r'expect\s*\(|'                  # Jest/Vitest expect
+        r'should\s+[a-z]|'              # RSpec should
+        r'\.should\.|'                   # Chian should
+        r'verify\s*\(|'                  # Mockito verify
+        r'assertEquals|assertTrue|assertFalse|assertNotNull|assertNull|'
+        r'assertThat|assertThrows|'       # JUnit/TestNG
+        r'XCTAssert|'                     # XCTest
+        r'assert_eq!|assert_ne!|assert!|' # Rust
+        r'require\.\w+\s*\(|'            # Node require assertions
+        r'Expect\s*\(|'                  # Go Expect
+        r'So\s*\(|'                      # Go So
+        r'Ω\s*\(|'                       # Gomega
+        r'\.assert\b'                     # Python attr
+        r')\s*[\[\(]',
+        re.MULTILINE,
+    )
+
+    for fpath in sorted(verifies_files):
+        try:
+            content = fpath.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+
+        assertions = ASSERTION_PATTERNS.findall(content)
+        if not assertions:
+            rel = fpath.relative_to(project_dir)
+            issues.append(
+                f"[assertions] {rel}: @verifies タグがあるが、"
+                f"実アサーション（assert/expect/should/verify）が見つからない"
+            )
+
+    return issues
+
+
+def check_mapping_freshness(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    P0-3: .trace-mapping.yaml エントリの鮮度チェック
+    - 各エントリの参照コードが直近 N 日以内に変更されているか
+    - git blame を使用（リポジトリが git 管理下であることが前提）
+    """
+    issues = []
+
+    # git リポジトリのチェック
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            capture_output=True, check=True, cwd=project_dir,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []  # git 管理下でなければスキップ
+
+    if not mappings:
+        return []
+
+    # 90日以内の閾値
+    STALE_DAYS = os.environ.get("TRACE_STALE_DAYS", "90")
+    try:
+        stale_days = int(STALE_DAYS)
+    except ValueError:
+        stale_days = 90
+
+    for m in mappings:
+        mid = m.get("id", "")
+        cfiles = m.get("code", {}).get("files", [])
+        if not mid or not cfiles:
+            continue
+
+        # frozen マークがあればスキップ
+        tags = m.get("tags", [])
+        if "@frozen" in tags:
+            continue
+
+        # 各参照ファイルの最終更新日を確認
+        stale_files = []
+        for pattern in cfiles:
+            resolved = list(project_dir.glob(pattern)) if "*" in pattern else [project_dir / pattern]
+            for fpath in resolved:
+                if not fpath.exists():
+                    continue
+                try:
+                    result = subprocess.run(
+                        ["git", "log", "-1", "--format=%ct", "--", str(fpath)],
+                        capture_output=True, text=True, check=True,
+                        cwd=project_dir,
+                    )
+                    if result.stdout.strip():
+                        last_ts = int(result.stdout.strip())
+                        import time
+                        age_days = (time.time() - last_ts) / 86400
+                        if age_days > stale_days:
+                            stale_files.append({
+                                "file": str(fpath.relative_to(project_dir)),
+                                "age_days": int(age_days),
+                            })
+                except (subprocess.CalledProcessError, ValueError):
+                    continue
+
+        if stale_files:
+            file_list = ", ".join(
+                f"{sf['file']} ({sf['age_days']}日)"
+                for sf in stale_files[:3]
+            )
+            suffix = f"... and {len(stale_files)-3} more" if len(stale_files) > 3 else ""
+            issues.append(
+                f"[stale] id={mid}: 参照ファイルが{stale_days}日以上未変更 — {file_list}{suffix}"
+                f"（@frozen タグで除外可）"
+            )
+
+    return issues
 
 AVAILABLE_CHECKS = {
     "impl": check_impl_completeness,
@@ -608,6 +757,9 @@ AVAILABLE_CHECKS = {
     "spec": check_spec_tags,
     "design": check_design_tags,
     "test": check_test_trace,
+    # P0 false-green ベクターチェック
+    "assertions": check_assertions_in_verifies,
+    "stale": check_mapping_freshness,
 }
 
 

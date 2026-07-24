@@ -1,0 +1,250 @@
+# cc-sdd-graph False-Green Vector Catalog
+# =========================================
+# Machine-readable corpus for the verifier-hardening loop.
+# Each vector describes a way the verifier could pass green when it should not.
+#
+# Hardening loop:
+#   1. Define vector (id, class, priority, invariant, mutation)
+#   2. Create 4 fixtures: green_control / false_green_candidate /
+#      false_red_guard / legacy_backcompat
+#   3. Inject mutation → record detection → fix highest priority
+#
+# priority_score = false_green_impact × reachability × likelihood
+#                  × diagnostic_confidence ÷ false_red_risk   (1-5)
+#
+# detection: caught_red | caught_amber | missed_green | n/a
+# status: shipped | fixtures_only | candidate | owner_gated | planned
+#
+# INVARIANTS:
+#   - Never violate backward compatibility
+#   - Never introduce false-red (legitimate green → red)
+#   - Detection logic must be derivable from existing contract semantics
+
+meta:
+  version: 1
+  created: "2026-07-25"
+  tool: "cc-sdd-graph"
+  project_url: "https://github.com/nekolife1984/cc-sdd-graph"
+
+# ================================================================
+# VECTORS
+# ================================================================
+vectors:
+
+  # ═══════════════════════════════════════════════════════════════
+  # P0 — Critical: must detect before merge
+  # ═══════════════════════════════════════════════════════════════
+
+  # ── P0-1: @impl orphan ──────────────────────────────────────
+  - id: impl_tag_orphan
+    class: coverage_gap
+    priority: P0
+    summary: |
+      @impl タグがあるコードがテスト実行カバレッジに含まれていない。
+      タグはあるが実際には実行されていないコードが"カバレッジ完了"と
+      誤認される。
+    invariant: |
+      全ての @impl 付きコード行は、直近の pytest/coverage run で
+      少なくとも1回ヒットされていなければならない。
+    mutation: |
+      @impl タグを追加するが、そのコードをテストから完全に除外する
+      （例: __pycache__ から削除、カバレッガーから除外）。
+    expected_detection: caught_red
+    severity: red
+    owner_gate: false
+    false_red_risk: 3
+    status: planned
+    detection: missed_green
+    check_framework: coverage
+    check: |
+      coverage json --include="*" 2>/dev/null | python3 -c "
+      import json, sys
+      data = json.load(sys.stdin)
+      # ... check each @impl file appears in coverage data ...
+      "
+    cli: check-trace-completeness.py --check-coverage
+
+  # ── P0-2: @verifies with no real assertion ──────────────────
+  - id: verifies_empty_assert
+    class: evidence_thinness
+    priority: P0
+    summary: |
+      @verifies タグがあるテストファイルが、実質的なアサーションを
+      含んでいない（assert True だけ、コメントだけ、passだけ）。
+    invariant: |
+      各 @verifies タグを持つテストファイルは、最低1つ以上の
+      実アサーション（assert/expect/should/require/verify）を含む。
+    mutation: |
+      テストファイルの全アサーションを pass/assert True に置き換える。
+    expected_detection: caught_red
+    severity: red
+    owner_gate: false
+    false_red_risk: 2  # assert無しテストが正当なケースは稀
+    status: planned
+    detection: missed_green
+    check_framework: grep
+    check: |
+      grep -cE '(assert|expect|should|require|verify|toEq|toEqual|assertEqual)'
+      on @verifies files
+    cli: check-trace-completeness.py --check-assertions
+
+  # ── P0-3: stale mapping entry ───────────────────────────────
+  - id: mapping_stale
+    class: temporal_decay
+    priority: P0
+    summary: |
+      .trace-mapping.yaml のエントリが長期間（デフォルト90日以上）
+      git blame でコード変更の対象になっておらず、実装と乖離している
+      可能性がある。
+    invariant: |
+      全 .trace-mapping.yaml エントリの参照先コードが90日以内に
+      変更されているか、または明示的に frozen マークが付いている。
+    mutation: |
+      .trace-mapping.yaml に id を追加するが、該当コードを1年間変更しない。
+    expected_detection: caught_amber  # 乖離"可能性"のため amber
+    severity: amber
+    owner_gate: false
+    false_red_risk: 4  # 変更が本当にない正当なケースもある
+    status: planned
+    detection: missed_green
+    check_framework: git
+    check: |
+      git blame --since=90.days .trace-mapping.yaml
+    cli: check_drift.py --check-stale
+
+  # ── P0-4: CI gate bypassed ──────────────────────────────────
+  - id: ci_gate_bypassed
+    class: procedural
+    priority: P0
+    summary: |
+      SKIP_TRACE=1 での push や、CIワークフローがスキップされた変更が
+      マージされている。
+    invariant: |
+      全 push/PR が traceability-check CI を通過している、または
+      bypass の理由が明示的に記録されている。
+    mutation: |
+      git push --no-verify でスキップ。
+    expected_detection: caught_amber
+    severity: amber
+    owner_gate: true  # 判断に人間が必要（緊急 bypass は正当）
+    false_red_risk: 5
+    status: planned
+    detection: missed_green
+    check_framework: github_actions
+    check: GitHub Actions workflow_run 履歴のチェック
+    cli: (外部監視ツール)
+
+  # ═══════════════════════════════════════════════════════════════
+  # P1 — Important: should detect for quality
+  # ═══════════════════════════════════════════════════════════════
+
+  # ── P1-1: spec without test coverage ────────────────────────
+  - id: spec_no_test_coverage
+    class: coverage_gap
+    priority: P1
+    summary: |
+      仕様IDに対応する @verifies テストがあるが、coverage run に
+      そのテストが含まれていない。
+    invariant: |
+      各 spec の @verifies ファイルが pytest --cov の実行対象に
+      含まれている。
+    mutation: |
+      テストファイルを coverage exclude パターンに追加。
+    expected_detection: caught_amber
+    severity: amber
+    owner_gate: false
+    false_red_risk: 3
+    status: planned
+    detection: missed_green
+    check_framework: coverage
+    cli: ci-check.sh --coverage
+
+  # ── P1-2: snapshot drift not committed ─────────────────────
+  - id: snapshot_missing_update
+    class: procedural
+    priority: P1
+    summary: |
+      コード変更後、.trace-snapshot.json が更新されずに
+      コミットされている。
+    invariant: |
+      コード変更を含む全コミットに check_drift.py --snapshot の
+      実行結果が含まれている。
+    mutation: |
+      git commit を pre-commit hook 無しで行う。
+    expected_detection: caught_amber
+    severity: amber
+    owner_gate: false
+    false_red_risk: 1
+    status: planned
+    detection: missed_green
+    check_framework: git
+    check: |
+      git diff HEAD~1 --name-only | grep -q "\.trace-snapshot\.json"
+    cli: pre-commit.sh（skip 検知）
+
+  # ── P1-3: cross-language tag mismatch ──────────────────────
+  - id: cross_language_tag_mismatch
+    class: semantic_mismatch
+    priority: P1
+    summary: |
+      同じ要件IDが異なる言語のファイルで使われているが、
+      一方にしか @impl がない。
+    invariant: |
+      全 @impl タグの要件IDが、言語を跨いで一貫している。
+    mutation: |
+      Pythonコードに @impl 1.1 を追加するが、TypeScriptコードの
+      該当箇所には @impl 1.1 を追加しない。
+    expected_detection: caught_amber
+    severity: amber
+    owner_gate: false
+    false_red_risk: 2
+    status: planned
+    detection: missed_green
+    check_framework: grep
+    cli: extract_tags.py --cross-ref
+
+  # ═══════════════════════════════════════════════════════════════
+  # P2 — Nice to have
+  # ═══════════════════════════════════════════════════════════════
+
+  # ── P2-1: mapping entry without description ─────────────────
+  - id: mapping_no_description
+    class: documentation_debt
+    priority: P2
+    summary: |
+      .trace-mapping.yaml に description がないエントリがある。
+      何の要件か人間が判断できない。
+    invariant: |
+      全 .trace-mapping.yaml mapping エントリに description が
+      設定されている。
+    mutation: |
+      description フィールドを削除。
+    expected_detection: caught_amber
+    severity: amber
+    owner_gate: true
+    false_red_risk: 1
+    status: planned
+    detection: missed_green
+    check_framework: yaml
+    cli: check-trace-completeness.py --check-descriptions
+
+  # ── P2-2: spec id declared in design but not trace-mapping ─
+  - id: spec_in_design_not_mapped
+    class: cross_reference_gap
+    priority: P2
+    summary: |
+      design.md に @satisfies 1.1 があるが、.trace-mapping.yaml
+      に id: 1.1 のエントリがない。
+    invariant: |
+      全 design.md の @satisfies 参照が .trace-mapping.yaml に
+      エントリを持つ。
+    mutation: |
+      .trace-mapping.yaml から該当エントリを削除。
+    expected_detection: caught_red
+    severity: red
+    owner_gate: false
+    false_red_risk: 1
+    status: planned
+    detection: missed_green
+    check_framework: yaml + grep
+    cli: check-trace-completeness.py（既存チェック8が部分的にカバー）

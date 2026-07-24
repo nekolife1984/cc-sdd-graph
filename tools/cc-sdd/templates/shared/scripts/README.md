@@ -188,7 +188,39 @@ python3 .agents/scripts/impact.py --spec-id 1.1 --json | jq '.band_summary'
 | `impact.py` | 仕様↔コードの双方向影響分析（`--quick` で .trace-mapping.yaml 不要） | 変更前に影響範囲を確認 |
 | `check_drift.py` | スナップショットベースのドリフト検出 | CI / pre-commit / cron |
 | `pre-commit.sh` | pre-commit hook（スナップショット自動更新） | コミット時 |
-| `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（@impl, code.files, code.symbols, @module, _Requirements:_, _Depends:_, @spec, @design, @satisfies, @verifies） | 実装完了時 / CI |
+|| `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（9標準 + 2 P0 false-green） | 実装完了時 / CI |
+
+## False-Green ベクター品質管理
+
+`quality/` ディレクトリに false-green 対策の設計書と検出状況を管理している:
+
+```bash
+# プロジェクトにコピーして使う
+cp -r tools/cc-sdd/templates/shared/quality/ .kiro/quality/
+```
+
+| ファイル | 内容 |
+|---------|------|
+| `false_green_vectors.yaml` | 機械可読なベクターカタログ（P0/P1/P2分類、invariant、mutation） |
+| `false_green_matrix.md` | 検出状況マトリクス + saturation 充足度 |
+
+### P0 ベクターチェック（出荷済み）
+
+`check-trace-completeness.py` に組み込み済み:
+
+```bash
+# @verifies ファイルの実アサーションチェック
+python3 .agents/scripts/check-trace-completeness.py --check assertions
+
+# .trace-mapping.yaml 参照コードの鮮度チェック（90日ルール）
+python3 .agents/scripts/check-trace-completeness.py --check stale
+
+# CI/CD で全チェックと一緒に実行
+python3 .agents/scripts/check-trace-completeness.py --check assertions,stale
+
+# 鮮度閾値のカスタマイズ（環境変数）
+TRACE_STALE_DAYS=180 python3 .agents/scripts/check-trace-completeness.py --check stale
+```
 
 ## よくある使い方
 
