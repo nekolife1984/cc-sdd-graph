@@ -1174,23 +1174,20 @@ def _render_graph_html(graph_data: dict, title: str) -> str:
     W, H = 1200, 800
     PAD = 60
 
-    # 座標を SVG 空間にマッピング
-    if pos:
-        xs = [p[0] for p in pos.values()]
-        ys = [p[1] for p in pos.values()]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        range_x = max(max_x - min_x, 1)
-        range_y = max(max_y - min_y, 1)
-    else:
-        range_x = range_y = 1
-        min_x = min_y = 0
+    # 座標を SVG 空間にマッピング（ラベル幅を考慮したパディング）
+    # はみ出さないようにレイアウトを再調整
+    pos2 = _compute_force_layout(nodes, edges, width=W, height=H)
+    max_label_w = max((len(n.get("label", "")) * 7.5 + 20) for n in nodes) if nodes else 100
+    margin = max(max_label_w / 2 + 20, 90)
+    for nid, (px, py) in pos2.items():
+        pos2[nid] = (min(max(px, margin), W - margin),
+                     min(max(py, margin * 0.4), H - margin * 0.4))
+    pos = pos2
+
+    # レイアウト座標を直接SVG座標として使う
 
     def to_svg(nid: str) -> tuple[float, float]:
-        px, py = pos.get(nid, (0, 0))
-        sx = PAD + (px - min_x) / range_x * (W - 2 * PAD)
-        sy = PAD + (py - min_y) / range_y * (H - 2 * PAD)
-        return sx, sy
+        return pos.get(nid, (W / 2, H / 2))
 
     group_colors = {
         "spec": {"fill": "#4a90d9", "stroke": "#2c5f9e", "text": "#fff"},
@@ -1404,81 +1401,68 @@ svg.addEventListener('wheel', function(e) {{
 
 
 def _compute_force_layout(nodes: list[dict], edges: list[dict],
-                          iterations: int = 300, width: float = 800,
-                          height: float = 600) -> dict[str, tuple[float, float]]:
-    """単純な力指向レイアウトを Python で計算する。"""
+                          iterations: int = 300, width: float = 1200,
+                          height: float = 800) -> dict[str, tuple[float, float]]:
+    """階層レイアウトを計算する。Specノードが上、コードが下、テスト・設計が横。"""
     import math
-    import random
 
-    pos: dict[str, list[float]] = {}
-    vel: dict[str, list[float]] = {}
+    pos: dict[str, tuple[float, float]] = {}
     node_ids = [n["id"] for n in nodes]
 
-    # 初期位置（円形に配置）
-    angle_step = 2 * math.pi / max(len(node_ids), 1)
-    for i, nid in enumerate(node_ids):
-        angle = i * angle_step
-        pos[nid] = [width / 2 + math.cos(angle) * 200,
-                    height / 2 + math.sin(angle) * 200]
-        vel[nid] = [0.0, 0.0]
+    if not node_ids:
+        return {}
 
-    # 隣接リスト
-    adj: dict[str, set[str]] = {nid: set() for nid in node_ids}
-    for e in edges:
-        frm, to = e.get("from"), e.get("to")
-        if frm in adj and to in adj:
-            adj[frm].add(to)
-            adj[to].add(frm)
+    # ノード種別でグループ化
+    spec_nodes: list[str] = []
+    code_nodes: list[str] = []
+    test_nodes: list[str] = []
+    design_nodes: list[str] = []
+    task_nodes: list[str] = []
 
-    # 力指向計算
-    for _ in range(iterations):
-        forces: dict[str, list[float]] = {nid: [0.0, 0.0] for nid in node_ids}
-        repulsion = 5000.0
-        attraction = 0.005
-        damping = 0.85
+    for n in nodes:
+        nid = n["id"]
+        grp = n.get("group", "")
+        if grp == "spec":
+            spec_nodes.append(nid)
+        elif grp == "code":
+            code_nodes.append(nid)
+        elif grp == "test":
+            test_nodes.append(nid)
+        elif grp == "design":
+            design_nodes.append(nid)
+        elif grp == "task":
+            task_nodes.append(nid)
 
-        # 反発力（全ノード間）
-        for i, a in enumerate(node_ids):
-            for b in node_ids[i + 1:]:
-                dx = pos[a][0] - pos[b][0]
-                dy = pos[a][1] - pos[b][1]
-                dist = max(math.hypot(dx, dy), 10)
-                fx = repulsion / (dist * dist) * (dx / dist)
-                fy = repulsion / (dist * dist) * (dy / dist)
-                forces[a][0] += fx
-                forces[a][1] += fy
-                forces[b][0] -= fx
-                forces[b][1] -= fy
+    def _arrange(nids: list[str], y: float, margin: float = 120) -> None:
+        if not nids:
+            return
+        count = len(nids)
+        if count == 1:
+            pos[nids[0]] = (width / 2, y)
+        else:
+            spacing = min((width - 2 * margin) / (count - 1), 220)
+            total_w = spacing * (count - 1)
+            start_x = (width - total_w) / 2
+            for i, nid in enumerate(nids):
+                pos[nid] = (start_x + i * spacing, y)
 
-        # 引力（エッジで接続されたノード間）
-        for e in edges:
-            frm, to = e.get("from"), e.get("to")
-            if frm not in pos or to not in pos:
-                continue
-            dx = pos[to][0] - pos[frm][0]
-            dy = pos[to][1] - pos[frm][1]
-            dist = max(math.hypot(dx, dy), 10)
-            fx = dx * attraction
-            fy = dy * attraction
-            forces[frm][0] += fx
-            forces[frm][1] += fy
-            forces[to][0] -= fx
-            forces[to][1] -= fy
+    _arrange(spec_nodes, height * 0.15)
+    _arrange(code_nodes, height * 0.40)
+    _arrange(test_nodes, height * 0.58)
 
-        # 中心引力
-        cx, cy = width / 2, height / 2
-        for nid in node_ids:
-            forces[nid][0] -= (pos[nid][0] - cx) * 0.001
-            forces[nid][1] -= (pos[nid][1] - cy) * 0.001
+    # 設計・タスクはコードの左右に
+    design_x = width * 0.05
+    task_x = width * 0.85
+    for i, nid in enumerate(design_nodes):
+        pos[nid] = (design_x, height * 0.40 + i * 60)
+    for i, nid in enumerate(task_nodes):
+        pos[nid] = (task_x, height * 0.40 + i * 60)
 
-        # 速度更新
-        for nid in node_ids:
-            vel[nid][0] = (vel[nid][0] + forces[nid][0]) * damping
-            vel[nid][1] = (vel[nid][1] + forces[nid][1]) * damping
-            pos[nid][0] += vel[nid][0]
-            pos[nid][1] += vel[nid][1]
+    # 未分類は下に
+    unplaced = [nid for nid in node_ids if nid not in pos]
+    _arrange(unplaced, height * 0.75)
 
-    return {nid: (pos[nid][0], pos[nid][1]) for nid in node_ids}
+    return pos
 
 
 def cmd_graph(mappings: list[dict], result: dict, output_path: str = "trace-graph.html",
