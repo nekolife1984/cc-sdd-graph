@@ -19,8 +19,14 @@ This skill performs **code-originated impact analysis**. When a specific file or
 
 ## Step 1: Load Context
 
-1. Verify `.trace-mapping.yaml` exists.
-2. Interpret target from `$1`:
+1. If `.trace-mapping.yaml` exists → use standard impact analysis (Steps 2-4)
+2. If `.trace-mapping.yaml` does NOT exist → fall back to `--quick` mode:
+   ```bash
+   python3 .agents/scripts/impact.py --quick --file <path> --project-dir .
+   ```
+   Quick mode greps `@impl`/`@spec`/`@verifies` tags directly from the codebase
+   without a mapping file (brownfield-friendly).
+3. Interpret target from `$1`:
    - File path (e.g., `src/ui/chat.py`) → single file analysis
    - `.` or `--diff` → git diff analysis
    - Empty → auto-detect files from last `/kiro-impl`
@@ -28,6 +34,7 @@ This skill performs **code-originated impact analysis**. When a specific file or
 ## Step 2: Code→Spec Trace
 
 1. Run `python3 .agents/scripts/impact.py --file <path> --json` for baseline
+   (or `--quick --file <path> --json` if no `.trace-mapping.yaml`)
 2. If empty (unregistered in `.trace-mapping.yaml`), check code for `@impl` tags:
    - Run `python3 .agents/scripts/extract_tags.py --file <path> --format json`
    - If `@impl` found → warn that mapping entry is missing

@@ -19,10 +19,15 @@ This skill performs **spec-originated impact analysis**. When a specific require
 
 ## Step 1: Load Context
 
-1. Verify `.trace-mapping.yaml` exists. If not, report: "`.trace-mapping.yaml` not found. Run `/kiro-spec-init` first or create the mapping file."
-2. Read `.trace-mapping.yaml`.
+1. If `.trace-mapping.yaml` exists:
+   - Read `.trace-mapping.yaml`
+   - Run `python3 .agents/scripts/impact.py --spec-id $1 --json` for baseline impact
+2. If `.trace-mapping.yaml` does NOT exist → fall back to `--quick` mode:
+   ```bash
+   python3 .agents/scripts/impact.py --quick --spec-id $1 --project-dir .
+   ```
+   Quick mode greps `@impl`/`@verifies`/`@spec` tags directly from the codebase.
 3. Extract spec ID from argument `$1` (e.g., `1.1`, `6.2`).
-4. Run `python3 .agents/scripts/impact.py --spec-id $1 --json` to get the baseline impact.
 
 ## Step 2: CRG Code Graph Investigation
 
