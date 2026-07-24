@@ -40,14 +40,14 @@ cc-sdd は spec を、システムの各部分の間の契約として扱う。�
 
 ```bash
 cd your-project
-npx cc-sdd@latest
+npx github:nekolife1984/cc-sdd-graph
 ```
 
 デフォルトでは **Claude Code Skills** と英語ドキュメントがインストールされる。他のエージェントや言語を指定する場合:
 
 ```bash
-npx cc-sdd@latest --codex-skills --lang ja      # Codex、日本語
-npx cc-sdd@latest --cursor-skills --lang zh-TW  # Cursor IDE、繁体字中国語
+npx github:nekolife1984/cc-sdd-graph --codex-skills --lang ja      # Codex、日本語
+npx github:nekolife1984/cc-sdd-graph --cursor-skills --lang zh-TW  # Cursor IDE、繁体字中国語
 ```
 
 8 つの AI coding agent（Claude Code と Codex は stable、Cursor, Copilot, Windsurf, OpenCode, Gemini CLI, Antigravity は beta）と 13 言語に対応。全リストは [対応エージェント](#対応エージェント) を参照。
@@ -119,33 +119,33 @@ spec フェーズの典型的な出力（10 分以内）:
 ### 言語
 
 ```bash
-npx cc-sdd@latest --lang ja    # 日本語
-npx cc-sdd@latest --lang zh-TW # 繁体字中国語
-npx cc-sdd@latest --lang es    # スペイン語
+npx github:nekolife1984/cc-sdd-graph --lang ja    # 日本語
+npx github:nekolife1984/cc-sdd-graph --lang zh-TW # 繁体字中国語
+npx github:nekolife1984/cc-sdd-graph --lang es    # スペイン語
 # 対応言語: en, ja, zh-TW, zh, es, pt, de, fr, ru, it, ko, ar, el
 ```
 
 ### レガシーモード（非推奨）
 
 ```bash
-npx cc-sdd@latest --claude        # Claude Code コマンド（--claude-skills を使用）
-npx cc-sdd@latest --claude-agent  # Claude Code subagent（--claude-skills を使用）
-npx cc-sdd@latest --cursor        # Cursor IDE コマンド（--cursor-skills を使用）
-npx cc-sdd@latest --copilot       # GitHub Copilot プロンプト（--copilot-skills を使用）
-npx cc-sdd@latest --windsurf      # Windsurf IDE ワークフロー（--windsurf-skills を使用）
-npx cc-sdd@latest --opencode      # OpenCode コマンド（--opencode-skills を使用）
-npx cc-sdd@latest --gemini        # Gemini CLI コマンド（--gemini-skills を使用）
-npx cc-sdd@latest --qwen          # Qwen Code
+npx github:nekolife1984/cc-sdd-graph --claude        # Claude Code コマンド（--claude-skills を使用）
+npx github:nekolife1984/cc-sdd-graph --claude-agent  # Claude Code subagent（--claude-skills を使用）
+npx github:nekolife1984/cc-sdd-graph --cursor        # Cursor IDE コマンド（--cursor-skills を使用）
+npx github:nekolife1984/cc-sdd-graph --copilot       # GitHub Copilot プロンプト（--copilot-skills を使用）
+npx github:nekolife1984/cc-sdd-graph --windsurf      # Windsurf IDE ワークフロー（--windsurf-skills を使用）
+npx github:nekolife1984/cc-sdd-graph --opencode      # OpenCode コマンド（--opencode-skills を使用）
+npx github:nekolife1984/cc-sdd-graph --gemini        # Gemini CLI コマンド（--gemini-skills を使用）
+npx github:nekolife1984/cc-sdd-graph --qwen          # Qwen Code
 ```
 
 ### 高度なオプション
 
 ```bash
 # 変更内容を先にプレビュー
-npx cc-sdd@latest --dry-run --backup
+npx github:nekolife1984/cc-sdd-graph --dry-run --backup
 
 # カスタム specs ディレクトリ
-npx cc-sdd@latest --kiro-dir docs
+npx github:nekolife1984/cc-sdd-graph --kiro-dir docs
 ```
 
 ## カスタマイズ

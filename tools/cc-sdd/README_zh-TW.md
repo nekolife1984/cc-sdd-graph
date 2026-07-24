@@ -40,14 +40,14 @@ cc-sdd 把 spec 視為系統各部分之間的契約，不是交給代理的「�
 
 ```bash
 cd your-project
-npx cc-sdd@latest
+npx github:nekolife1984/cc-sdd-graph
 ```
 
 預設會安裝 **Claude Code Skills** 與英文文件。若要指定其他代理或語言:
 
 ```bash
-npx cc-sdd@latest --codex-skills --lang ja      # Codex, 日語
-npx cc-sdd@latest --cursor-skills --lang zh-TW  # Cursor IDE, 繁體中文
+npx github:nekolife1984/cc-sdd-graph --codex-skills --lang ja      # Codex, 日語
+npx github:nekolife1984/cc-sdd-graph --cursor-skills --lang zh-TW  # Cursor IDE, 繁體中文
 ```
 
 支援 8 個 AI coding agent（Claude Code 與 Codex 為 stable；Cursor, Copilot, Windsurf, OpenCode, Gemini CLI, Antigravity 為 beta）和 13 種語言。完整列表請參考 [支援的代理](#支援的代理)。
@@ -119,33 +119,33 @@ spec 階段的典型產出（10 分鐘以內）:
 ### 語言
 
 ```bash
-npx cc-sdd@latest --lang zh-TW # 繁體中文
-npx cc-sdd@latest --lang ja    # 日語
-npx cc-sdd@latest --lang es    # 西班牙語
+npx github:nekolife1984/cc-sdd-graph --lang zh-TW # 繁體中文
+npx github:nekolife1984/cc-sdd-graph --lang ja    # 日語
+npx github:nekolife1984/cc-sdd-graph --lang es    # 西班牙語
 # 支援語言: en, ja, zh-TW, zh, es, pt, de, fr, ru, it, ko, ar, el
 ```
 
 ### 舊版模式（已棄用）
 
 ```bash
-npx cc-sdd@latest --claude        # Claude Code 指令（請改用 --claude-skills）
-npx cc-sdd@latest --claude-agent  # Claude Code subagent（請改用 --claude-skills）
-npx cc-sdd@latest --cursor        # Cursor IDE 指令（請改用 --cursor-skills）
-npx cc-sdd@latest --copilot       # GitHub Copilot 提示（請改用 --copilot-skills）
-npx cc-sdd@latest --windsurf      # Windsurf IDE 工作流程（請改用 --windsurf-skills）
-npx cc-sdd@latest --opencode      # OpenCode 指令（請改用 --opencode-skills）
-npx cc-sdd@latest --gemini        # Gemini CLI 指令（請改用 --gemini-skills）
-npx cc-sdd@latest --qwen          # Qwen Code
+npx github:nekolife1984/cc-sdd-graph --claude        # Claude Code 指令（請改用 --claude-skills）
+npx github:nekolife1984/cc-sdd-graph --claude-agent  # Claude Code subagent（請改用 --claude-skills）
+npx github:nekolife1984/cc-sdd-graph --cursor        # Cursor IDE 指令（請改用 --cursor-skills）
+npx github:nekolife1984/cc-sdd-graph --copilot       # GitHub Copilot 提示（請改用 --copilot-skills）
+npx github:nekolife1984/cc-sdd-graph --windsurf      # Windsurf IDE 工作流程（請改用 --windsurf-skills）
+npx github:nekolife1984/cc-sdd-graph --opencode      # OpenCode 指令（請改用 --opencode-skills）
+npx github:nekolife1984/cc-sdd-graph --gemini        # Gemini CLI 指令（請改用 --gemini-skills）
+npx github:nekolife1984/cc-sdd-graph --qwen          # Qwen Code
 ```
 
 ### 進階選項
 
 ```bash
 # 套用前先預覽變更
-npx cc-sdd@latest --dry-run --backup
+npx github:nekolife1984/cc-sdd-graph --dry-run --backup
 
 # 自訂 specs 目錄
-npx cc-sdd@latest --kiro-dir docs
+npx github:nekolife1984/cc-sdd-graph --kiro-dir docs
 ```
 
 ## 自訂
