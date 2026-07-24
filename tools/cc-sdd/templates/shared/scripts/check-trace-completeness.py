@@ -36,7 +36,7 @@ Checks:
   9. test      — @verifies ↔ .trace-mapping.yaml 完全性（テストファイル）
 
   P0 false-green ベクターチェック:
-  10. coverage   — @impl ファイルのカバレッジ実行確認
+  10. coverage   — @impl タグ行のカバレッジ実行確認（行レベル、coverage.json/.coverage/LCOV対応）
   11. assertions — @verifies ファイルの実アサーション有無
   12. stale      — .trace-mapping.yaml 参照ファイルの鮮度（90日ルール）
 """
@@ -756,15 +756,18 @@ def check_mapping_freshness(project_dir: Path, mappings: list[dict]) -> list[str
 
 def check_coverage_impl(project_dir: Path, mappings: list[dict]) -> list[str]:
     """
-    P0-1: @impl タグコードがカバレッジで実行されているか
-    - 既存のカバレッジレポートを読み込み（coverage.json / .coverage）
-    - @impl タグのある各ファイルが coverage で hit されているか確認
+    P0-1（Layer 2）: @impl タグ行がカバレッジで実行されているか
+    - coverage.json / .coverage / LCOV の3形式に対応
+    - ファイルレベルのみ→行レベルに拡張
+    - @impl タグのある行が実際に実行されたかを検証
     - カバレッジデータがない場合はスキップ＋警告
     """
     issues = []
 
-    # @impl ファイルを収集
-    impl_files: dict[str, Path] = {}
+    # @impl ファイルと行番号を収集
+    impl_lines: dict[str, list[int]] = {}  # rel_path → [line_numbers]
+    impl_file_set: dict[str, Path] = {}
+
     for ext in EXTENSIONS:
         for fpath in sorted(project_dir.rglob(f"*{ext}")):
             if any(part in (".venv", "node_modules", ".git", "dist", "build", "__pycache__")
@@ -774,40 +777,76 @@ def check_coverage_impl(project_dir: Path, mappings: list[dict]) -> list[str]:
                 content = fpath.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
-            if IMPL_TAG_RE.search(content):
+            lines = content.split("\n")
+            impl_tag_lines = []
+            for lineno, line in enumerate(lines, 1):
+                if IMPL_TAG_RE.search(line):
+                    impl_tag_lines.append(lineno)
+            if impl_tag_lines:
                 rel = str(fpath.relative_to(project_dir))
-                impl_files[rel] = fpath
+                impl_lines[rel] = impl_tag_lines
+                impl_file_set[rel] = fpath
 
-    if not impl_files:
+    if not impl_lines:
         return []
 
-    # カバレッジデータを探す
-    coverage_data: set[str] = set()  # hit されたファイルパス（相対）
+    # カバレッジデータを読み込む（行レベル）
+    coverage_hit_lines: dict[str, set[int]] = {}  # rel_path → {hit_line_numbers}
     coverage_source = None
 
-    # 1) coverage.json（--cov-json / pytest-cov JSON 出力）
-    cov_json_paths = [
-        project_dir / "coverage.json",
-        project_dir / "coverage/coverage.json",
+    # 1) LCOV 形式（lcov.info / coverage.lcov）
+    lcov_paths = [
+        project_dir / "lcov.info",
+        project_dir / "coverage/lcov.info",
+        project_dir / "coverage.lcov",
+        project_dir / "coverage/coverage.lcov",
     ]
-    for cpath in cov_json_paths:
-        if cpath.exists():
+    for lpath in lcov_paths:
+        if lpath.exists():
             try:
-                import json
-                data = json.loads(cpath.read_text(encoding="utf-8"))
-                files_section = data.get("files", data)
-                for filepath, file_data in files_section.items():
-                    if isinstance(file_data, dict):
-                        summary = file_data.get("summary", file_data)
-                        covered = summary.get("covered_lines", summary.get("covered", 0))
-                        if covered and covered > 0:
-                            coverage_data.add(filepath)
-                coverage_source = str(cpath.relative_to(project_dir))
+                _parse_lcov(lpath, coverage_hit_lines)
+                coverage_source = str(lpath.relative_to(project_dir))
                 break
             except Exception:
                 continue
 
-    # 2) .coverage（SQLite 形式）
+    # 2) coverage.json（pytest-cov JSON）
+    if not coverage_source:
+        cov_json_paths = [
+            project_dir / "coverage.json",
+            project_dir / "coverage/coverage.json",
+        ]
+        for cpath in cov_json_paths:
+            if cpath.exists():
+                try:
+                    import json
+                    data = json.loads(cpath.read_text(encoding="utf-8"))
+                    files_section = data.get("files", data)
+                    for filepath, file_data in files_section.items():
+                        if not isinstance(file_data, dict):
+                            continue
+                        # 行レベルのカバレッジを抽出
+                        detail = file_data.get("detail", {})
+                        if detail:
+                            # "lines": {"1": 1, "2": 1, "3": 0} 形式
+                            for line_str, hit_count in detail.items():
+                                try:
+                                    line_num = int(line_str)
+                                except ValueError:
+                                    continue
+                                if hit_count and hit_count > 0:
+                                    coverage_hit_lines.setdefault(filepath, set()).add(line_num)
+                        else:
+                            # summary しかない場合はファイル全体がhitしていれば全行hit扱い
+                            summary = file_data.get("summary", file_data)
+                            covered = summary.get("covered_lines", summary.get("covered", 0))
+                            if covered and covered > 0:
+                                coverage_hit_lines.setdefault(filepath, set())
+                    coverage_source = str(cpath.relative_to(project_dir))
+                except Exception:
+                    continue
+
+    # 3) .coverage（SQLite 形式）
     if not coverage_source:
         dot_coverage = project_dir / ".coverage"
         if dot_coverage.exists():
@@ -819,9 +858,13 @@ def check_coverage_impl(project_dir: Path, mappings: list[dict]) -> list[str]:
                 for filepath in data.measured_files():
                     try:
                         rel_fp = str(Path(filepath).relative_to(project_dir))
-                        coverage_data.add(rel_fp)
                     except ValueError:
-                        coverage_data.add(filepath)
+                        rel_fp = filepath
+                    # 行レベルの情報を取得
+                    lines_data = data.line_data(filepath) or {}
+                    for line_no, hit_count in lines_data.items():
+                        if hit_count and hit_count > 0:
+                            coverage_hit_lines.setdefault(rel_fp, set()).add(line_no)
                 coverage_source = ".coverage"
             except ImportError:
                 issues.append(
@@ -831,28 +874,100 @@ def check_coverage_impl(project_dir: Path, mappings: list[dict]) -> list[str]:
             except Exception:
                 pass
 
-    # 3) カバレッジデータなし → 情報提供
+    # 4) カバレッジデータなし
     if not coverage_source:
         issues.append(
             f"[coverage] カバレッジデータが見つかりません — "
-            f"@impl ファイル {len(impl_files)} 件のカバレッジ未確認"
+            f"@impl ファイル {len(impl_lines)} 件のカバレッジ未確認"
         )
         issues.append(
-            "[coverage] 実行方法: pytest --cov --cov-report=json -q 2>/dev/null"
+            "[coverage] 対応形式: coverage.json / .coverage / lcov.info / coverage.lcov"
+        )
+        issues.append(
+            "[coverage] 実行例: pytest --cov --cov-report=json -q 2>/dev/null"
         )
         return issues
 
-    # 各 @impl ファイルが coverage に含まれているか
-    for rel, fpath in sorted(impl_files.items()):
-        if rel not in coverage_data:
-            resolved = str(fpath.resolve())
-            if resolved not in coverage_data:
-                issues.append(
-                    f"[coverage] @impl ファイル '{rel}' がカバレッジ実行で"
-                    f"ヒットしていない（{coverage_source}）"
-                )
+    # 各 @impl タグ行がカバレッジでヒットしているか確認
+    file_issues: dict[str, list[str]] = {}
+    total_impl_tags = 0
+    total_hit = 0
+
+    for rel, tag_lines in sorted(impl_lines.items()):
+        hit_lines = coverage_hit_lines.get(rel, set())
+        not_hit = [ln for ln in tag_lines if ln not in hit_lines]
+
+        total_impl_tags += len(tag_lines)
+        total_hit += len(tag_lines) - len(not_hit)
+
+        if not_hit:
+            # ファイルがカバレッジデータに存在しない場合
+            if not coverage_hit_lines.get(rel):
+                # 似たパスでも確認
+                resolved = str(impl_file_set[rel].resolve())
+                if resolved not in coverage_hit_lines:
+                    file_issues[rel] = [
+                        f"lines {','.join(str(x) for x in not_hit)}"
+                        for _ in [1]
+                    ]
+                else:
+                    hit_lines2 = coverage_hit_lines.get(resolved, set())
+                    not_hit2 = [ln for ln in tag_lines if ln not in hit_lines2]
+                    if not_hit2:
+                        file_issues[rel] = [
+                            f"lines {','.join(str(x) for x in not_hit2)}"
+                        ]
+            else:
+                file_issues[rel] = [
+                    f"lines {','.join(str(x) for x in not_hit)}"
+                ]
+
+    for rel, lines_desc in sorted(file_issues.items()):
+        for desc in lines_desc:
+            issues.append(
+                f"[coverage] {rel} の @impl タグ行({desc})がカバレッジで"
+                f"ヒットしていません（{coverage_source}）"
+            )
+
+    # サマリー情報
+    hit_ratio = (total_hit / total_impl_tags * 100) if total_impl_tags > 0 else 0
+    if total_impl_tags > 0:
+        issues.append(
+            f"[coverage] @impl タグ行カバレッジ: {total_hit}/{total_impl_tags} "
+            f"({hit_ratio:.0f}%) — {coverage_source}"
+        )
 
     return issues
+
+
+def _parse_lcov(lcov_path: Path, out: dict[str, set[int]]) -> None:
+    """LCOV ファイルをパースして行レベルのヒット情報を抽出する。
+
+    LCOV 形式（geninfo/lcov の標準出力形式）:
+      SF:/path/to/file.py
+      DA:1,1    ← line 1, hit count 1
+      DA:2,0    ← line 2, not hit
+      DA:5,3    ← line 5, hit count 3
+      end_of_record
+    """
+    content = lcov_path.read_text(encoding="utf-8")
+    current_file = None
+    for line in content.split("\n"):
+        line = line.strip()
+        if line.startswith("SF:"):
+            current_file = line[3:].strip()
+        elif line.startswith("DA:") and current_file:
+            parts = line[3:].split(",")
+            if len(parts) >= 2:
+                try:
+                    line_no = int(parts[0].strip())
+                    hit_count = int(parts[1].strip())
+                    if hit_count > 0:
+                        out.setdefault(current_file, set()).add(line_no)
+                except ValueError:
+                    continue
+        elif line == "end_of_record":
+            current_file = None
 
 
 AVAILABLE_CHECKS = {

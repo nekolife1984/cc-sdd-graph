@@ -302,7 +302,7 @@ bash .agents/scripts/check-gate.sh
 
 | チェック | ベクター | 検出ロジック | 準備 |
 |---------|:--------:|-------------|------|
-| `coverage` | P0-1 @impl orphan | @impl ファイルが coverage.json/.coverage にヒットしているか | `pytest --cov --cov-report=json` |
+| `coverage` | P0-1 @impl orphan（Layer 2） | @impl タグ行がcoverageでヒットしたか（行レベル） | `pytest --cov --cov-report=json` または `lcov` |
 | `assertions` | P0-2 空アサーション | @verifies ファイルに assert/expect/should があるか | なし（静的解析） |
 | `stale` | P0-3 stale mapping | 参照コードが90日以上未変更か | git 管理下であること |
 
