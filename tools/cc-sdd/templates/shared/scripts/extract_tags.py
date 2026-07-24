@@ -41,32 +41,37 @@ TAG_RE = re.compile(
 
 
 def extract_tags_from_file(filepath: Path) -> list[dict]:
-    """ファイルから全てのタグを抽出する。"""
+    """ファイルから全てのタグを抽出する。
+
+    注意: .md ファイルの説明用HTMLコメント内の # @impl を誤検知しないよう、
+    HTMLコメントを除去してからコードタグを抽出する。
+    """
     try:
         content = filepath.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
         return []
 
     tags = []
-    for match in TAG_RE.finditer(content):
-        # コードタグ: # @impl, # @module, # @feature
-        tag_type = match.group("tag")
-        if tag_type:
-            value = match.group("value").strip().rstrip(",")
-            tags.append({
-                "file": str(filepath),
-                "tag": tag_type,
-                "value": value,
-            })
-        # Markdown HTMLコメントタグ: <!-- @spec, @design, @satisfies -->
-        md_tag = match.group("mdtag")
-        if md_tag:
-            md_value = match.group("mdvalue").strip().rstrip(",")
-            tags.append({
-                "file": str(filepath),
-                "tag": md_tag,
-                "value": md_value,
-            })
+
+    # 1. 仕様書タグ（<!-- @spec, @design, @satisfies -->）を抽出（HTMLコメント内が正しい位置）
+    spec_re = re.compile(r'<!--\s*@(?P<tag>spec|design|satisfies)\s+(?P<value>.+?)\s*-->', re.MULTILINE)
+    for match in spec_re.finditer(content):
+        tags.append({
+            "file": str(filepath),
+            "tag": match.group("tag"),
+            "value": match.group("value").strip().rstrip(","),
+        })
+
+    # 2. HTMLコメントを除去してからコードタグ（# @impl, # @module, # @feature）を抽出
+    content_no_html = re.sub(r'<!--.*?-->', '', content, flags=re.MULTILINE | re.DOTALL)
+    code_re = re.compile(r'#\s*@(?P<tag>impl|module|feature)\s+(?P<value>.+?)(?:\s*$|#)', re.MULTILINE)
+    for match in code_re.finditer(content_no_html):
+        tags.append({
+            "file": str(filepath),
+            "tag": match.group("tag"),
+            "value": match.group("value").strip().rstrip(","),
+        })
+
     return tags
 
 
