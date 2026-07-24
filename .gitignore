@@ -91,3 +91,4 @@ docs/kiro/
 
 # Local dev tooling (not part of the project)
 .entire/.kiro/graph/
+.kiro/graph/
