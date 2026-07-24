@@ -33,27 +33,39 @@ ln -sf ../../.agents/scripts/pre-commit.sh .git/hooks/pre-commit
 - コード変更をスナップショットに記録
 - 新しい `@impl` タグの有無をチェック
 
-### 2. CI/CD ゲート（GitHub Actions の場合）
+### 2. CI/CD ゲート（GitHub Actions の場合） — 3段階
 
-プッシュ時にドリフトを検出して CI を失敗させる。
+テンプレートファイルをプロジェクトにコピーするだけで有効になる:
 
-```yaml
-# .github/workflows/traceability-check.yml
-name: Traceability Check
-on: [push, pull_request]
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: pip install pyyaml
-      - name: Check drift
-        run: python3 .agents/scripts/check_drift.py --diff --gate
-        # --gate 付きでドリフト検出時に exit 1 → CI が失敗
+```bash
+cp tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml \
+  .github/workflows/traceability-check.yml
+```
+
+プッシュ / PR のたびに以下を自動実行（pip install pyyaml が必要）:
+
+| ジョブ | ゲート | 内容 |
+|-------|:------:|------|
+| **trace-completeness** | ❌ Block | 全9チェック（@impl/@spec/@verifies の網羅性） |
+| **drift-check** | ❌ Block | コードと仕様書の乖離検出 |
+| **impact-report** | ✅ Info | PRの影響範囲レポート（非ブロッキング） |
+
+yaml 全文は `.github/workflows/traceability-check.yml` を参照。
+
+### 2b. ローカルCIチェック（opt-in）
+
+CIと同じチェックをコミット前にローカルで実行:
+
+```bash
+# インストール（ワンタイム）
+cp tools/cc-sdd/templates/shared/scripts/ci-check.sh .agents/scripts/ci-check.sh
+chmod +x .agents/scripts/ci-check.sh
+
+# 手動実行
+bash .agents/scripts/ci-check.sh
+
+# または pre-push hook として（任意）
+ln -sf ../../.agents/scripts/ci-check.sh .git/hooks/pre-push
 ```
 
 ### 3. Hermes cron 定期監視

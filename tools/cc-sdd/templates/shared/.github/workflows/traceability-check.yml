@@ -1,0 +1,80 @@
+# cc-sdd-graph Traceability CI
+# =============================
+# プロジェクトにコピーして使います（.github/workflows/traceability-check.yml）。
+# pip install pyyaml が必要です。
+#
+# 使い方:
+#   cp tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml \
+#     .github/workflows/traceability-check.yml
+#
+# 3段階ゲート:
+#   1. trace-completeness — 全9チェック（@impl/@spec/@verifies 等の網羅性）
+#   2. drift-check       — コードと仕様書の乖離検出
+#   3. impact-report     — PRへの影響範囲コメント（任意、非ブロッキング）
+#
+# ローカルで同じチェックを実行:
+#   bash .agents/scripts/ci-check.sh
+
+name: Traceability Check
+on: [push, pull_request]
+
+jobs:
+  # ── Stage 1: 全9チェック（ブロッキング） ──
+  trace-completeness:
+    name: Trace Completeness Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install pyyaml
+      - name: Run trace completeness gate
+        run: |
+          echo "::group::9 checks: impl, files, symbols, module, requirements, depends, spec, design, test"
+          python3 .agents/scripts/check-trace-completeness.py
+          echo "::endgroup::"
+        # exit 1 on failure → CI fails, PR blocked
+
+  # ── Stage 2: ドリフト検出（ブロッキング） ──
+  drift-check:
+    name: Spec↔Code Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # merge-base 計算に必要
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install pyyaml
+      - name: Check drift against base branch
+        run: |
+          echo "::group::Drift detection (spec changed but code/tests didn't)"
+          python3 .agents/scripts/check_drift.py --diff --gate
+          echo "::endgroup::"
+        # --gate: drift detected → exit 1 → CI fail
+
+  # ── Stage 3: 影響レポート（非ブロッキング、PRコメント） ──
+  impact-report:
+    name: Impact Report
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install pyyaml
+      - name: Generate impact summary
+        id: impact
+        run: |
+          echo "::group::Quick impact analysis for this diff"
+          python3 .agents/scripts/impact.py --quick --diff
+          echo "::endgroup::"
+        continue-on-error: true  # 非ブロッキング（参考情報）
