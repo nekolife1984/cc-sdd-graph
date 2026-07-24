@@ -67,8 +67,14 @@ After all parallel research completes, synthesize findings before generating tas
 
 - Keep the draft task plan in working memory; do NOT write `tasks.md` yet
 - Run the `Task Plan Review Gate` from `rules/tasks-generation.md`
-- Review coverage:
-  - Every requirement ID appears in at least one task
+#### CRG Dependency Verification
+If the codebase has existing code and CRG tools are available, validate `_Boundary:_` annotations:
+- For each `_Boundary:_` component, call `get_impact_radius_tool` to get the actual code graph impact scope
+- Compare actual impact against declared boundary — warn if narrower (hidden deps) or wider (overscoped)
+- Flag undeclared dependencies not in `_Depends:_`
+
+Review coverage:
+  - All requirement IDs appear in at least one task
   - Every design component, contract, integration point, runtime prerequisite, and validation concern is represented
 - Review executability:
   - Each sub-task is an executable 1-3 hour work unit

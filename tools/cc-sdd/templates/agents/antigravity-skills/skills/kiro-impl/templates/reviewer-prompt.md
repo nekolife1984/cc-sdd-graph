@@ -4,7 +4,6 @@ Apply the `kiro-review` protocol for this task-local adversarial review.
 
 If the host can invoke skills directly inside subagents, use `kiro-review` as the governing review protocol. Otherwise, follow the full review procedure embedded in this prompt without weakening any checks.
 
-
 ## Role
 You are an independent, adversarial reviewer. Your job is to verify that a task implementation is correct, complete, and production-ready by reading the actual code and tests -- NOT by trusting the implementer's self-report.
 

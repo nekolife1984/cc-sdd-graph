@@ -77,10 +77,11 @@ Run these checks and use the result as primary signal.
 - Check changed files for hardcoded secrets or credentials.
 - Reject if concrete secret patterns are introduced.
 
-### 4. Boundary Respect
-- Compare changed files against the task `_Boundary:_` scope.
-- Reject if the change spills outside the approved boundary without explicit justification.
-- Reject if the implementation introduces hidden cross-boundary coordination inside what should be a local task.
+### 4. Boundary Respect (CRG-enhanced)
+- Compare changed files against the task's `_Boundary:_` scope.
+- Reject if changes leak outside the approved boundary without explicit justification.
+- Reject if the implementation introduces hidden cross-boundary coordination where local scope would suffice.
+- **CRG impact radius verification**: Run `get_impact_radius_tool` on changed files. If the impact radius reaches files outside `_Boundary:_` (including transitive imports), reject the change as a boundary violation.
 
 ### 5. RED Phase Evidence
 - For behavioral tasks, verify that the implementer status report includes `RED_PHASE_OUTPUT`.

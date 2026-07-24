@@ -143,6 +143,13 @@ If multi-agent capability is available, for each task (one at a time):
 **f) Record learnings**:
 - If this task revealed cross-cutting insights, append a one-line note to the `## Implementation Notes` section at the bottom of tasks.md
 
+**f.5) Update .trace-mapping.yaml**:
+After commit (auto mode) or task completion (manual mode):
+1. Run `python3 .agents/scripts/extract_tags.py --file <each changed file> --format json` to detect new `@impl` tags
+2. Check if detected tags exist in `.trace-mapping.yaml`
+3. If not, add new entries following existing format (`id: "X.Y"`, `spec:`, `design:`, `code.files`, `code.symbols`, `tasks:`, `tags: ["@impl"]`)
+4. If `.trace-mapping.yaml` doesn't exist, create it
+
 **g) Debug subagent** (triggered by BLOCKED, NEEDS_CONTEXT unresolved, or REJECTED after 2 remediation rounds):
 
 The debug subagent runs in a **fresh context** — it receives only the error information, not the failed implementation history. This avoids the context pollution that causes infinite retry loops.
@@ -170,7 +177,7 @@ The debug subagent runs in a **fresh context** — it receives only the error in
 
 **`(P)` markers**: Tasks marked `(P)` in tasks.md indicate they have no inter-dependencies and could theoretically run in parallel. However, kiro-impl processes them sequentially (one at a time) to avoid git conflicts and simplify review. The `(P)` marker is informational for task planning, not an execution directive.
 
-**Fallback**: Windsurf does not support programmatic sub-agent dispatch. Execute all tasks sequentially in the main context using the manual mode execution flow below.
+**Fallback**: If multi-agent is not available, fall back to manual mode execution for all tasks.
 
 ### Manual Mode (main context)
 
@@ -189,7 +196,7 @@ Before writing any code, read the relevant sections of requirements.md and desig
 - **REFACTOR**: Improve code structure, remove duplication. All tests must still pass.
 - **VERIFY**: All tests pass (new and existing), no regressions. Confirm verification method passes.
 - **REVIEW**:
-  - `required`: Apply `kiro-review` before marking the task complete. If the host supports fresh subagents in manual mode, use a fresh reviewer; otherwise perform the review in the main context using the `kiro-review` protocol. Do NOT continue until the verdict is parseably `APPROVED`.
+  - `required`: Apply `kiro-review` before marking the task complete. If the host supports fresh sub-agents in manual mode, use a fresh reviewer; otherwise perform the review in the main context using the `kiro-review` protocol. Do NOT continue until the verdict is parseably `APPROVED`.
   - `inline`: Apply `kiro-review` in the main context before marking the task complete.
   - `off`: Skip task-local review, but note that `kiro-validate-impl` becomes the primary quality gate before any feature-level completion claim.
 - **MARK COMPLETE**:
@@ -199,7 +206,7 @@ Before writing any code, read the relevant sections of requirements.md and desig
 ## Step 4: Final Validation
 
 **Autonomous mode**:
-- After all tasks complete, run `@kiro-validate-impl $1` as a GO/NO-GO gate
+- After all tasks complete, run `$kiro-validate-impl $1` as a GO/NO-GO gate
 - If validation returns GO → before reporting feature success, apply `kiro-verify-completion` to the feature-level claim using the validation result and fresh supporting evidence
 - If validation returns NO-GO:
   - Fix only concrete findings from the validation report
@@ -207,8 +214,8 @@ Before writing any code, read the relevant sections of requirements.md and desig
 - If validation returns MANUAL_VERIFY_REQUIRED → stop and report the missing verification step
 
 **Manual mode**:
-- Suggest running `@kiro-validate-impl $1` but do not auto-execute
-- If review mode is `off`, treat `@kiro-validate-impl $1` as mandatory before any feature-level success claim
+- Suggest running `$kiro-validate-impl $1` but do not auto-execute
+- If review mode is `off`, treat `$kiro-validate-impl $1` as mandatory before any feature-level success claim
 
 ## Feature Flag Protocol
 
@@ -245,7 +252,7 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 
 **Tasks Not Approved or Missing Spec Files**:
 - **Stop Execution**: All spec files must exist and tasks must be approved
-- **Suggested Action**: "Complete previous phases: `@kiro-spec-requirements`, `@kiro-spec-design`, `@kiro-spec-tasks`"
+- **Suggested Action**: "Complete previous phases: `$kiro-spec-requirements`, `$kiro-spec-design`, `$kiro-spec-tasks`"
 
 **Test Failures**:
 - **Stop Implementation**: Fix failing tests before continuing
@@ -265,5 +272,5 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 - If debug returns `NEXT_ACTION: STOP_FOR_HUMAN` because of task ordering, boundary, or decomposition problems, stop and return for human review of `tasks.md` or the approved plan instead of forcing a code workaround
 
 **Session Interrupted**:
-- Safe to re-run `@kiro-impl $1` — completed tasks are already `[x]` in tasks.md and committed to git
+- Safe to re-run `$kiro-impl $1` — completed tasks are already `[x]` in tasks.md and committed to git
 - The controller re-reads tasks.md on each iteration, so it will pick up where it left off automatically

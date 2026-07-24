@@ -143,6 +143,13 @@ If multi-agent capability is available, for each task (one at a time):
 **f) Record learnings**:
 - If this task revealed cross-cutting insights, append a one-line note to the `## Implementation Notes` section at the bottom of tasks.md
 
+**f.5) Update .trace-mapping.yaml**:
+After commit (auto mode) or task completion (manual mode):
+1. Run `python3 .agents/scripts/extract_tags.py --file <each changed file> --format json` to detect new `@impl` tags
+2. Check if detected tags exist in `.trace-mapping.yaml`
+3. If not, add new entries following existing format (`id: "X.Y"`, `spec:`, `design:`, `code.files`, `code.symbols`, `tasks:`, `tags: ["@impl"]`)
+4. If `.trace-mapping.yaml` doesn't exist, create it
+
 **g) Debug subagent** (triggered by BLOCKED, NEEDS_CONTEXT unresolved, or REJECTED after 2 remediation rounds):
 
 The debug subagent runs in a **fresh context** — it receives only the error information, not the failed implementation history. This avoids the context pollution that causes infinite retry loops.

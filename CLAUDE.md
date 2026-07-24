@@ -2,6 +2,30 @@
 
 Kiro-style Spec-Driven Development on an agentic SDLC
 
+## CRG MCP Tools (code-review-graph)
+
+This project integrates **code-review-graph (CRG)** MCP tools for code-graph-aware impact analysis across all phases:
+
+- **kiro-spec-design**: Uses `get_architecture_overview_tool`, `semantic_search_nodes_tool`, `query_graph_tool` during codebase analysis
+- **kiro-spec-tasks**: Validates `_Boundary:_` annotations against `get_impact_radius_tool`
+- **kiro-review**: Enhanced Boundary Respect check with CRG impact radius verification
+- **kiro-validate-impl**: Uses `get_affected_flows_tool` for cross-task integration validation
+- **kiro-debug**: Uses `query_graph_tool` and `get_impact_radius_tool` for root cause investigation
+- **kiro-trace**: Traces spec changes to code impact
+- **kiro-impact**: Traces code changes back to affected specs
+- **kiro-validate-boundary**: Mechanically verifies `_Boundary:_` against CRG graph
+
+## Traceability
+
+Projects can maintain a `.trace-mapping.yaml` file linking spec IDs to code files, symbols, tasks, and docs.
+Scripts in `.agents/scripts/` provide automated impact analysis:
+
+| Script | Purpose |
+|--------|---------|
+| `extract_tags.py` | Extract `@impl`/`@module`/`@feature` tags from code |
+| `impact.py` | Bidirectional spec↔code impact analysis |
+| `check_drift.py` | Snapshot-based drift detection between code and specs |
+
 ## Project Context
 
 ### Paths

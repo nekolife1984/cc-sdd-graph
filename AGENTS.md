@@ -39,7 +39,7 @@ Kiro-style Spec-Driven Development on an agentic SDLC
 - Progress check: `/kiro-spec-status {feature}` (use anytime)
 
 ## Skills Structure
-Skills are located under the agent-specific skills directory (e.g., `.claude/skills/kiro-*/SKILL.md`, `.agents/skills/kiro-*/SKILL.md` for Codex, `.cursor/skills/kiro-*/SKILL.md`, etc.).
+Skills are located in `.agents/skills/kiro-*/SKILL.md` (or agent-specific paths like `.claude/skills/`, `.opencode/skills/`, etc.)
 - Each skill is a directory with a `SKILL.md` file
 - Skills run inline with access to conversation context
 - Skills may delegate parallel research to subagents for efficiency
@@ -47,6 +47,11 @@ Skills are located under the agent-specific skills directory (e.g., `.claude/ski
 - `kiro-review` — task-local adversarial review protocol used by reviewer subagents
 - `kiro-debug` — root-cause-first debug protocol used by debugger subagents
 - `kiro-verify-completion` — fresh-evidence gate before success or completion claims
+- `kiro-trace` — trace spec changes to code impact (requires `.trace-mapping.yaml`)
+- `kiro-impact` — trace code changes back to affected specs
+- `kiro-validate-boundary` — mechanically verify `_Boundary:_` against CRG code graph
+- **CRG MCP tools** (code-review-graph) are used by design, review, validation, and debug skills for code-graph-aware impact analysis
+- **Traceability**: Projects with `.trace-mapping.yaml` get automated impact analysis via `.agents/scripts/impact.py` and drift detection via `.agents/scripts/check_drift.py`
 - **If there is even a 1% chance a skill applies to the current task, invoke it.** Do not skip skills because the task seems simple.
 
 ## Development Rules

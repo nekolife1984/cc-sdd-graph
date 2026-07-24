@@ -56,7 +56,13 @@ Extract:
 - Whether the failure is deterministic or intermittent
 
 ### 2. Inspect Local Runtime and Repository State
-Inspect the repository for local evidence:
+
+**CRG Code Graph Investigation**: Use CRG tools to understand the failure context:
+- `query_graph_tool` — trace callers/callees and import dependencies of the failing code
+- `get_impact_radius_tool` — check blast radius to determine if other components are affected
+- `semantic_search_nodes_tool` — find similar error patterns in related functions
+
+Investigate local evidence within the repository:
 - `package.json`, `pyproject.toml`, `go.mod`, `Makefile`, `README*`
 - Build config
 - `tsconfig` or equivalent language/runtime config

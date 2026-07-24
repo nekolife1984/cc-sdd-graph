@@ -31,7 +31,7 @@ description: Create complete specs (requirements, design, tasks) for all feature
    - `## Direct Implementation Candidates`
    Do not include these in dependency-wave execution; they are awareness-only inputs for sequencing and consistency review.
 4. For each pending feature in `## Specs (dependency order)`, verify `{{KIRO_DIR}}/specs/<feature>/brief.md` exists
-5. If any brief.md is missing, stop and report: "Missing brief.md for: [list]. Run `/kiro-discovery` to generate briefs first."
+5. If any brief.md is missing, stop and report: "Missing brief.md for: [list]. Run `$kiro-discovery` to generate briefs first."
 
 ## Step 2: Build Dependency Waves
 
@@ -65,10 +65,10 @@ Create a complete specification for feature "{feature-name}".
 1. Read the brief at {{KIRO_DIR}}/specs/{feature-name}/brief.md for feature context
 2. Read the roadmap at {{KIRO_DIR}}/steering/roadmap.md for project context
 3. Execute the full spec pipeline. For each phase, read the corresponding skill's SKILL.md for complete instructions (templates, rules, review gates):
-   a. Initialize: Read .cursor/skills/kiro-spec-init/SKILL.md, then create spec.json and requirements.md
-   b. Generate requirements: Read .cursor/skills/kiro-spec-requirements/SKILL.md, then follow its steps
-   c. Generate design: Read .cursor/skills/kiro-spec-design/SKILL.md, then follow its steps
-   d. Generate tasks: Read .cursor/skills/kiro-spec-tasks/SKILL.md, then follow its steps
+   a. Initialize: Read .agents/skills/kiro-spec-init/SKILL.md, then create spec.json and requirements.md
+   b. Generate requirements: Read .agents/skills/kiro-spec-requirements/SKILL.md, then follow its steps
+   c. Generate design: Read .agents/skills/kiro-spec-design/SKILL.md, then follow its steps
+   d. Generate tasks: Read .agents/skills/kiro-spec-tasks/SKILL.md, then follow its steps
 4. Set all approvals to true in spec.json (auto-approve mode, equivalent of -y flag)
 5. Report completion with file list and task count
 ```
@@ -83,7 +83,7 @@ If multi-agent is not available, execute features in the wave sequentially.
 
 ## Step 4: Cross-Spec Review
 
-After all waves complete, spawn a **single sub-agent** for cross-spec consistency review. This is the highest-value quality gate -- it catches issues that per-spec review gates cannot.
+After all waves complete, spawn a **single sub-agent** for cross-spec consistency review. Use the `spec-reviewer` custom agent if available (configured with `model = "gpt-5.4"` and `model_reasoning_effort = "high"` in `.codex/agents/spec-reviewer.toml`). This is the highest-value quality gate -- it catches issues that per-spec review gates cannot.
 
 **Sub-agent task**:
 
@@ -120,6 +120,10 @@ Output: CONSISTENT areas + ISSUES with (which specs, what's inconsistent, sugges
 2. For each completed spec, read spec.json to confirm phase and approvals
 3. Update roadmap.md: mark completed specs as `[x]`
 4. If roadmap.md includes `Existing Spec Updates` or `Direct Implementation Candidates`, leave them untouched and mention them as remaining follow-up items unless already explicitly completed elsewhere
+5. Auto-generate `.trace-mapping.yaml` skeleton entries:
+   - For each completed spec, extract `requirements.md` requirement IDs
+   - Create or append to `.trace-mapping.yaml` with basic entries (`id`, `spec`, `design`, empty `code.files`, empty `tasks`, `tags: ["@impl"]`)
+   - If `.trace-mapping.yaml` exists, merge with existing entries (don't overwrite duplicate `id` values)
 
 Display final summary:
 ```
@@ -133,7 +137,7 @@ Spec Batch Complete:
   Existing spec updates pending: <count or none>
   Direct implementation candidates pending: <count or none>
 
-Next: Review generated specs, then start implementation with /kiro-impl <feature>
+Next: Review generated specs, then start implementation with $kiro-impl <feature>
 ```
 
 </instructions>
@@ -152,14 +156,14 @@ Next: Review generated specs, then start implementation with /kiro-impl <feature
 - Log the error, skip the failed feature
 - Continue with remaining features in the wave
 - Report failed features in the summary
-- Suggest: "Run `/kiro-spec-quick <feature> --auto` manually for failed features."
+- Suggest: "Run `$kiro-spec-quick <feature> --auto` manually for failed features."
 
 **Circular dependencies**:
 - If dependency graph has cycles, report the cycle and stop
 - Suggest: "Fix dependency ordering in roadmap.md"
 
 **Roadmap not found**:
-- Stop and report: "No roadmap.md found. Run `/kiro-discovery` first."
+- Stop and report: "No roadmap.md found. Run `$kiro-discovery` first."
 
 **All specs already complete**:
 - Report: "All specs in roadmap.md are already complete. Nothing to do."

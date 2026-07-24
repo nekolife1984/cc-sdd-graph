@@ -105,8 +105,9 @@ For each detected feature:
 
 #### Judgment Checks (read code, compare to spec)
 
-**E. Cross-Task Integration**
-- Identify where tasks share interfaces, data models, or API contracts
+**E. Cross-Task Integration (CRG-enhanced)**
+- Identify shared interfaces, data models, and API contracts across tasks.
+- **CRG flow validation**: Run `get_affected_flows_tool` on the implemented code and verify execution paths match the architecture flows in design.md. For example, if design.md specifies "ChatUI → AgentEngine → External API", verify the CRG graph shows the exact same call chain without unexpected bypasses.
 - Verify that Task A's output format matches Task B's expected input
 - Check for conflicting assumptions between tasks (naming conventions, error codes, data shapes)
 - Verify shared state (database schemas, config, environment) is consistent across tasks

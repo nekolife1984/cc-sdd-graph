@@ -120,6 +120,10 @@ Output: CONSISTENT areas + ISSUES with (which specs, what's inconsistent, sugges
 2. For each completed spec, read spec.json to confirm phase and approvals
 3. Update roadmap.md: mark completed specs as `[x]`
 4. If roadmap.md includes `Existing Spec Updates` or `Direct Implementation Candidates`, leave them untouched and mention them as remaining follow-up items unless already explicitly completed elsewhere
+5. Auto-generate `.trace-mapping.yaml` skeleton entries:
+   - For each completed spec, extract `requirements.md` requirement IDs
+   - Create or append to `.trace-mapping.yaml` with basic entries (`id`, `spec`, `design`, empty `code.files`, empty `tasks`, `tags: ["@impl"]`)
+   - If `.trace-mapping.yaml` exists, merge with existing entries (don't overwrite duplicate `id` values)
 
 Display final summary:
 ```

@@ -18,6 +18,8 @@ Use whichever pattern fits the work breakdown:
   - _Boundary: {{COMPONENT_NAMES}}_ *(Only for (P) tasks. Omit when scope is obvious.)*
   - _Depends: {{TASK_IDS}}_ *(Only for non-obvious cross-boundary dependencies. Most tasks omit this.)*
 
+> **Traceability**: Requirement IDs in `_Requirements:_` are used as `# @impl X.Y` tags during implementation. `_Boundary:_` is validated against `.trace-mapping.yaml`'s `code.files` / `code.symbols` and can be mechanically verified via CRG `get_impact_radius_tool`.
+
 > **Parallel marker**: Append ` (P)` only to tasks that can be executed in parallel. Omit the marker when running in `--sequential` mode.
 >
 > **Optional test coverage**: When a sub-task is deferrable test work tied to acceptance criteria, mark the checkbox as `- [ ]*` and explain the referenced requirements in the detail bullets.

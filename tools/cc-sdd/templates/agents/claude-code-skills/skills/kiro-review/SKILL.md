@@ -1,14 +1,11 @@
 ---
 name: kiro-review
 description: Review a task implementation against approved specs, task boundaries, and verification evidence. Use after an implementer finishes a task, after remediation, or before accepting a task as complete.
-allowed-tools: Read, Bash, Grep, Glob
-argument-hint: <task-id>
 ---
 
 # kiro-review
 
-## Overview
-
+<background_information>
 This skill performs task-local adversarial review. It verifies that the implementation is real, complete, bounded, aligned with approved requirements and design, and supported by mechanical verification evidence.
 
 Boundary terminology continuity:
@@ -16,7 +13,9 @@ Boundary terminology continuity:
 - design fixes `Boundary Commitments`
 - tasks constrain execution with `_Boundary:_`
 - review rejects concrete `Boundary Violations`
+</background_information>
 
+<instructions>
 ## When to Use
 
 - After an implementer reports `READY_FOR_REVIEW`
@@ -78,10 +77,11 @@ Run these checks and use the result as primary signal.
 - Check changed files for hardcoded secrets or credentials.
 - Reject if concrete secret patterns are introduced.
 
-### 4. Boundary Respect
-- Compare changed files against the task `_Boundary:_` scope.
-- Reject if the change spills outside the approved boundary without explicit justification.
-- Reject if the implementation introduces hidden cross-boundary coordination inside what should be a local task.
+### 4. Boundary Respect (CRG-enhanced)
+- Compare changed files against the task's `_Boundary:_` scope.
+- Reject if changes leak outside the approved boundary without explicit justification.
+- Reject if the implementation introduces hidden cross-boundary coordination where local scope would suffice.
+- **CRG impact radius verification**: Run `get_impact_radius_tool` on changed files. If the impact radius reaches files outside `_Boundary:_` (including transitive imports), reject the change as a boundary violation.
 
 ### 5. RED Phase Evidence
 - For behavioral tasks, verify that the implementer status report includes `RED_PHASE_OUTPUT`.
@@ -169,3 +169,4 @@ Escalate instead of papering over the issue when:
 - REMEDIATION: <mandatory if REJECTED>
 - SUMMARY: <one sentence>
 ```
+</instructions>

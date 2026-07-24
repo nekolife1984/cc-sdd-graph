@@ -1,0 +1,60 @@
+# .trace-mapping.yaml — 仕様 ↔ コード トレーサビリティマッピング
+#
+# cc-sdd で生成した specs と実装コードを紐付けるためのファイル。
+# このファイルをプロジェクトルートに配置し、コードに @impl タグを
+# 追加することで、仕様変更時の影響分析が可能になります。
+#
+# 使い方:
+#   1. cc-sdd で spec を生成（requirements.md に要件ID: 1, 2, 3...）
+#   2. 実装コードにコメントで # @impl 1.1 タグを追加
+#   3. このファイルにマッピングを追記
+#   4. python3 .agents/scripts/impact.py --spec-id 1.1 で影響分析
+#   5. python3 .agents/scripts/check_drift.py --snapshot でベースライン保存
+#
+# 自動生成:
+#   /kiro-spec-batch が spec 生成時にスケルトンを作成
+#   /kiro-impl が実装完了後に extract_tags.py を呼び出して更新
+#   手動追加: python3 .agents/scripts/extract_tags.py --trace-mapping
+
+mappings:
+  # ── 要件単位のマッピング ──
+  # id は requirements.md の要件見出し番号と一致させる
+  - id: "1.1"
+    description: "要件の説明（1行）"
+    spec: .kiro/specs/{feature}/requirements.md#要件-1
+    design: .kiro/specs/{feature}/design.md#ComponentName
+    code:
+      files:
+        - src/feature/file.py
+      symbols:
+        - ClassName.method_name
+    tasks:
+      - .kiro/specs/{feature}/tasks.md#X.Y
+    docs:
+      - .kiro/specs/{feature}/design.md#ComponentName
+    tags: ["@impl"]
+
+  # ── モジュールレベルのマッピング（アーキテクチャ検証用） ──
+  - id: "module-{name}"
+    description: "モジュールの説明"
+    spec: .kiro/specs/{feature}/requirements.md
+    design: .kiro/specs/{feature}/design.md#{module}
+    code:
+      files:
+        - src/{module}/**/*.py
+      symbols:
+        - ModuleClass
+    docs:
+      - .kiro/specs/{feature}/design.md#{module}
+    tags: ["@module"]
+
+# 参考: コード内のタグ記法
+#
+#   # @impl 1.1, 1.2          ← この関数が要件 1.1 と 1.2 を実装
+#   # @module auth            ← このファイルは auth モジュール
+#   # @feature user-auth      ← このファイルは user-auth フィーチャー
+#
+# スクリプト:
+#   extract_tags.py  → コードから @impl/@module/@feature タグを抽出
+#   impact.py        → 仕様↔コードの双方向影響分析
+#   check_drift.py   → スナップショットベースのドリフト検出

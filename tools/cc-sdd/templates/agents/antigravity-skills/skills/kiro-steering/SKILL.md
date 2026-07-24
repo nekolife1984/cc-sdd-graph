@@ -131,11 +131,11 @@ Review and approve as Source of Truth.
 ## Examples
 
 ### Bootstrap
-**Input**: Empty steering, React TypeScript project
+**Input**: Empty steering, React TypeScript project  
 **Output**: 3 files with patterns - "Feature-first", "TypeScript strict", "React 19"
 
 ### Sync
-**Input**: Existing steering, new `/api` directory
+**Input**: Existing steering, new `/api` directory  
 **Output**: Updated structure.md, flagged non-compliant files, suggested api-standards.md
 
 ## Safety & Fallback

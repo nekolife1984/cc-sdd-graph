@@ -72,9 +72,16 @@ The following research areas are independent and can be dispatched as **sub-agen
 - **External research**: Dependencies, APIs, latest best practices
 - **Context loading** (usually main context): Steering files, design principles, discovery rules, templates
 
-For simple additions, skip sub-agent dispatch entirely and do a quick pattern check in main context.
+sub-agents as needed; skip sub-agent dispatch entirely for simple additions.
 
-After all findings return, synthesize in main context before proceeding.
+#### Code Graph Analysis (CRG MCP)
+When modifying existing codebases, use CRG tools to inform the design:
+- `get_architecture_overview_tool` — get the full codebase structure
+- `semantic_search_nodes_tool` — find existing symbols related to requirements
+- `query_graph_tool` — visualize imports and dependency chains
+Incorporate the graph findings into the File Structure Plan and Components sections.
+
+Once all research results return, synthesize in main context before proceeding.
 
 3. **Retain Discovery Findings for Step 3**:
    - External API contracts and constraints

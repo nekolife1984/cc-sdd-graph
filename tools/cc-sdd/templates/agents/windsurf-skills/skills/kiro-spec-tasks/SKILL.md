@@ -67,8 +67,14 @@ After all parallel research completes, synthesize findings before generating tas
 
 - Keep the draft task plan in working memory; do NOT write `tasks.md` yet
 - Run the `Task Plan Review Gate` from `rules/tasks-generation.md`
-- Review coverage:
-  - Every requirement ID appears in at least one task
+#### CRG Dependency Verification
+If the codebase has existing code and CRG tools are available, validate `_Boundary:_` annotations:
+- For each `_Boundary:_` component, call `get_impact_radius_tool` to get the actual code graph impact scope
+- Compare actual impact against declared boundary — warn if narrower (hidden deps) or wider (overscoped)
+- Flag undeclared dependencies not in `_Depends:_`
+
+Review coverage:
+  - All requirement IDs appear in at least one task
   - Every design component, contract, integration point, runtime prerequisite, and validation concern is represented
 - Review executability:
   - Each sub-task is an executable 1-3 hour work unit
@@ -115,13 +121,13 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
 - If auto-approve flag (`-y`) is provided:
   - Set `approvals.tasks.approved: true` in spec.json
   - Display task summary (task count, major groups, parallel markers)
-  - Respond: "Tasks generated and auto-approved. Start implementation with `@kiro-impl $1`"
+  - Respond: "Tasks generated and auto-approved. Start implementation with `$kiro-impl $1`"
 - Otherwise (interactive):
   - Display a summary of the generated tasks (task count, major groups, parallel markers)
   - Ask the user: "Tasks generated. Approve and proceed to implementation?"
   - If the user approves:
     - Set `approvals.tasks.approved: true` in spec.json
-    - Respond: "Tasks approved. Start implementation with `@kiro-impl $1`"
+    - Respond: "Tasks approved. Start implementation with `$kiro-impl $1`"
   - If the user wants changes:
     - Keep `approvals.tasks.approved: false`
     - Respond with guidance on what to adjust and re-run
@@ -162,7 +168,7 @@ Provide brief summary in the language specified in spec.json:
 **Requirements or Design Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements and design
 - **User Message**: "Requirements and design must be approved before task generation"
-- **Suggested Action**: "Run `@kiro-spec-tasks $1 -y` to auto-approve both and proceed"
+- **Suggested Action**: "Run `$kiro-spec-tasks $1 -y` to auto-approve both and proceed"
 
 **Missing Requirements or Design**:
 - **Stop Execution**: Both documents must exist
@@ -176,7 +182,7 @@ Provide brief summary in the language specified in spec.json:
 **Spec Gap Found During Task Review**:
 - **Stop Execution**: Do not write a patched-over `tasks.md`
 - **User Message**: "Requirements/design do not provide enough clear coverage to generate an executable task plan"
-- **Suggested Action**: "Refine requirements.md or design.md, then re-run `@kiro-spec-tasks $1`"
+- **Suggested Action**: "Refine requirements.md or design.md, then re-run `$kiro-spec-tasks $1`"
 
 **Template/Rules Missing**:
 - **User Message**: "Template or rules files missing in `{{KIRO_DIR}}/settings/`"
@@ -188,5 +194,5 @@ Provide brief summary in the language specified in spec.json:
 ### Next Phase: Implementation
 
 Tasks are approved in Step 4 via user confirmation. Once approved:
-- Autonomous implementation: `@kiro-impl $1`
-- Specific tasks only: `@kiro-impl $1 1.1,1.2`
+- Autonomous implementation: `$kiro-impl $1`
+- Specific tasks only: `$kiro-impl $1 1.1,1.2`
