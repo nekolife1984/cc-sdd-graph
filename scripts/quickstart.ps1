@@ -2,7 +2,8 @@
 .SYNOPSIS
     One-command cc-sdd-graph + CRG setup (Windows PowerShell)
 .DESCRIPTION
-    Installs cc-sdd-graph skills/templates and code-review-graph.
+Installs cc-sdd-graph skills/templates, code-review-graph,
+and optionally copies CI/CD templates.
 .PARAMETER Yes
     Auto mode (skip prompts)
 .EXAMPLE
@@ -149,6 +150,51 @@ if (Test-Path ".agents/scripts/check_drift.py") {
         Write-Ok "Initial snapshot saved"
     } catch { Write-Warn "Snapshot failed" }
 } else { Write-Warn "check_drift.py not found" }
+
+# ── Step 5: CI/CD Templates (opt-in) ──
+Write-Host ""
+Write-Info "Step 5/5: CI/CD Templates (optional)..."
+Write-Host ""
+Write-Host "  cc-sdd-graph includes CI/CD templates for GitHub Actions:"
+Write-Host "    * traceability-check.yml — 3-stage gate (PR blocking)"
+Write-Host "    * ci-check.sh — local equivalent for pre-push"
+Write-Host ""
+if (-not $Yes) {
+    $ciChoice = Read-Host "  Copy CI/CD templates to this project? (y/N)"
+} else {
+    $ciChoice = "n"
+}
+if ($ciChoice -eq "y" -or $ciChoice -eq "Y") {
+    $templateSrc = ""
+    if (Test-Path "tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml") {
+        $templateSrc = "tools/cc-sdd/templates/shared"
+    }
+    if ($templateSrc -ne "") {
+        # GitHub Actions workflow
+        New-Item -ItemType Directory -Force -Path ".github/workflows" | Out-Null
+        try {
+            Copy-Item "$templateSrc/.github/workflows/traceability-check.yml" ".github/workflows/traceability-check.yml"
+            Write-Ok "Copied .github/workflows/traceability-check.yml"
+        } catch { Write-Warn "Failed to copy GitHub Actions workflow" }
+
+        # ci-check.sh
+        if (Test-Path "$templateSrc/scripts/ci-check.sh") {
+            try {
+                Copy-Item "$templateSrc/scripts/ci-check.sh" ".agents/scripts/ci-check.sh"
+                Write-Ok "Copied .agents/scripts/ci-check.sh"
+            } catch { Write-Warn "Failed to copy ci-check.sh" }
+        }
+    } else {
+        Write-Warn "Template files not found locally."
+        Write-Host "  Install manually from the cc-sdd-graph repo:"
+        Write-Host "    Copy-Item tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml .github/workflows/"
+        Write-Host "    Copy-Item tools/cc-sdd/templates/shared/scripts/ci-check.sh .agents/scripts/"
+    }
+} else {
+    Write-Info "Skipping CI/CD templates. Install later with:"
+    Write-Host "    Copy-Item tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml .github/workflows/"
+    Write-Host "    Copy-Item tools/cc-sdd/templates/shared/scripts/ci-check.sh .agents/scripts/"
+}
 
 # ── Completion ──
 Write-Host ""

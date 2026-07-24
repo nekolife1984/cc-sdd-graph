@@ -13,6 +13,8 @@
 #   1. Installs cc-sdd-graph skills and templates
 #   2. Installs and configures code-review-graph
 #   3. Initializes .trace-mapping.yaml
+#   4. Saves initial snapshot
+#   5. (opt-in) Copies CI/CD templates
 
 set -euo pipefail
 
@@ -182,6 +184,58 @@ if [ -f ".agents/scripts/check_drift.py" ]; then
 else
   warn "check_drift.py not found"
 fi
+
+# ── Step 5: CI/CD Templates (opt-in) ──────────────────
+echo ""
+info "Step 5/5: CI/CD Templates (optional)..."
+echo ""
+echo "  cc-sdd-graph includes CI/CD templates for GitHub Actions:"
+echo "    • traceability-check.yml — 3-stage gate (PR blocking)"
+echo "    • ci-check.sh — local equivalent for pre-push"
+echo ""
+echo -n "  Copy CI/CD templates to this project? (y/N): "
+read -r CI_CHOICE
+
+case "${CI_CHOICE:-n}" in
+  y|Y|yes|YES)
+    # Try to find template files
+    TEMPLATE_SRC=""
+    # Check if we're in a clone of the repo
+    if [ -f "tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml" ]; then
+      TEMPLATE_SRC="tools/cc-sdd/templates/shared"
+    # Check if it was installed via npx (look in common locations)
+    elif [ -f ".agents/skills/.gitattributes" ] && [ -d "tools" ]; then
+      TEMPLATE_SRC="tools/cc-sdd/templates/shared"
+    fi
+
+    if [ -n "$TEMPLATE_SRC" ]; then
+      # GitHub Actions workflow
+      mkdir -p .github/workflows
+      cp "$TEMPLATE_SRC/.github/workflows/traceability-check.yml" \
+        .github/workflows/traceability-check.yml 2>/dev/null && \
+        ok "Copied .github/workflows/traceability-check.yml" || \
+        warn "Failed to copy GitHub Actions workflow"
+
+      # ci-check.sh
+      if [ -f "$TEMPLATE_SRC/scripts/ci-check.sh" ]; then
+        cp "$TEMPLATE_SRC/scripts/ci-check.sh" .agents/scripts/ci-check.sh 2>/dev/null && \
+          chmod +x .agents/scripts/ci-check.sh 2>/dev/null && \
+          ok "Copied .agents/scripts/ci-check.sh" || \
+          warn "Failed to copy ci-check.sh"
+      fi
+    else
+      warn "Template files not found locally."
+      echo "  To install manually, run from the cc-sdd-graph repo:"
+      echo "    cp tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml .github/workflows/"
+      echo "    cp tools/cc-sdd/templates/shared/scripts/ci-check.sh .agents/scripts/"
+    fi
+    ;;
+  *)
+    info "Skipping CI/CD templates. Install later with:"
+    echo "  cp tools/cc-sdd/templates/shared/.github/workflows/traceability-check.yml .github/workflows/"
+    echo "  cp tools/cc-sdd/templates/shared/scripts/ci-check.sh .agents/scripts/"
+    ;;
+esac
 
 # ── Completion ─────────────────────────────────────────
 echo ""
