@@ -1550,6 +1550,8 @@ def main():
                         help="DAGファイル（.kiro/graph/dag.json）を読み込み推移的影響分析を行う。"
                              "build-dag.py で事前にDAGを構築しておく必要あり。"
                              "CRG(code-review-graph)がなくても推移的依存を追跡可能。")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="詳細出力（DAG読み込み情報等）")
     args = parser.parse_args()
 
     if args.crg_hook:
@@ -1618,12 +1620,11 @@ def main():
                     if transitive_files:
                         result["files"] = list(existing) + transitive_files
                         result["files_transitive"] = transitive_files
-                        # _print_human 用に dag_transitive 情報を追加
                         result["dag_transitive"] = [
                             {"file": tf, "hops": si.get("hops", {}).get(tf, "?")}
                             for tf in transitive_files
                         ]
-                if args.verbose:
+                if getattr(args, 'verbose', False):
                     for sp_id, si in sorted(spec_impact.items()):
                         if si.get("transitive"):
                             print(f"  [dag] {sp_id}: direct={len(si['direct'])}, "
@@ -1631,8 +1632,9 @@ def main():
             except (json.JSONDecodeError, Exception) as e:
                 print(f"WARNING: Failed to load DAG: {e}", file=sys.stderr)
         else:
-            print(f"INFO: DAG not found at {dag_path}. Run build-dag.py first.",
-                  file=sys.stderr)
+            if getattr(args, 'verbose', False):
+                print(f"INFO: DAG not found at {dag_path}. Run build-dag.py first.",
+                      file=sys.stderr)
 
     # --band フィルターが指定された場合、バンドで絞り込み
     if args.band and "banded" in result:
