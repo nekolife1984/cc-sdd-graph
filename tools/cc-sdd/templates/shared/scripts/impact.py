@@ -1162,9 +1162,105 @@ def _gather_graph_data(mappings: list[dict], result: dict) -> dict:
 
 
 def _render_graph_html(graph_data: dict, title: str) -> str:
-    """グラフデータを vis-network を使った HTML にレンダリングする。"""
-    nodes_json = json.dumps(graph_data.get("nodes", []), ensure_ascii=False)
-    edges_json = json.dumps(graph_data.get("edges", []), ensure_ascii=False)
+    """グラフデータを自己完結型HTML（外部依存なし）にレンダリングする。"""
+    nodes = graph_data.get("nodes", [])
+    edges = graph_data.get("edges", [])
+
+    # 単純な力指向レイアウトをPythonで計算
+    import math
+    pos = _compute_force_layout(nodes, edges)
+
+    # SVG サイズ
+    W, H = 1200, 800
+    PAD = 60
+
+    # 座標を SVG 空間にマッピング
+    if pos:
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        range_x = max(max_x - min_x, 1)
+        range_y = max(max_y - min_y, 1)
+    else:
+        range_x = range_y = 1
+        min_x = min_y = 0
+
+    def to_svg(nid: str) -> tuple[float, float]:
+        px, py = pos.get(nid, (0, 0))
+        sx = PAD + (px - min_x) / range_x * (W - 2 * PAD)
+        sy = PAD + (py - min_y) / range_y * (H - 2 * PAD)
+        return sx, sy
+
+    group_colors = {
+        "spec": {"fill": "#4a90d9", "stroke": "#2c5f9e", "text": "#fff"},
+        "code": {"fill": "#50b86c", "stroke": "#2e7d46", "text": "#fff"},
+        "test": {"fill": "#e8a838", "stroke": "#b57c1e", "text": "#fff"},
+        "design": {"fill": "#9b59b6", "stroke": "#6c3483", "text": "#fff"},
+        "task": {"fill": "#e67e22", "stroke": "#a85d16", "text": "#fff"},
+    }
+    band_colors = {"green": "#2ecc71", "amber": "#f39c12", "gray": "#95a5a6"}
+
+    # SVG エレメント生成
+    def _node_color(n: dict) -> str:
+        band = n.get("band", "")
+        return band_colors.get(band, group_colors.get(n.get("group", "spec"), {}).get("fill", "#666"))
+
+    def _node_label(n: dict) -> str:
+        lbl = n.get("label", "?")
+        return lbl[:30] + "..." if len(lbl) > 30 else lbl
+
+    # SVG ビルド
+    svg_nodes: list[str] = []
+    svg_edges: list[str] = []
+
+    for e in edges:
+        frm, to = e.get("from"), e.get("to")
+        if frm not in pos or to not in pos:
+            continue
+        x1, y1 = to_svg(frm)
+        x2, y2 = to_svg(to)
+        label = e.get("label", "")
+        svg_edges.append(
+            f'<line x1="{x1:.0f}" y1="{y1:.0f}" x2="{x2:.0f}" y2="{y2:.0f}" '
+            f'stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>'
+        )
+        if label:
+            mx, my = (x1 + x2) / 2, (y1 + y2) / 2 - 8
+            svg_edges.append(
+                f'<text x="{mx:.0f}" y="{my:.0f}" fill="#888" font-size="10" '
+                f'text-anchor="middle">{label}</text>'
+            )
+
+    for n in nodes:
+        nid = n.get("id", "")
+        if nid not in pos:
+            continue
+        x, y = to_svg(nid)
+        color = _node_color(n)
+        grp = n.get("group", "spec")
+        gc = group_colors.get(grp, group_colors["spec"])
+        bw = 2 if n.get("band") else 1
+        label = _node_label(n)
+        title = n.get("title", "").replace('"', "'")
+        w = max(len(label) * 7.5, 60)
+        h = 28
+        rx, ry = 4, 4
+
+        svg_nodes.append(
+            f'<g class="node" data-id="{nid}" data-title="{title}" '
+            f'data-band="{n.get("band", "")}" data-group="{grp}">'
+            f'<rect x="{x - w / 2:.0f}" y="{y - h / 2:.0f}" width="{w:.0f}" '
+            f'height="{h:.0f}" rx="{rx}" ry="{ry}" '
+            f'fill="{color}" stroke="{gc["stroke"]}" stroke-width="{bw}" '
+            f'style="cursor:pointer"/>'
+            f'<text x="{x:.0f}" y="{y + 5:.0f}" fill="{gc["text"]}" '
+            f'font-size="12" text-anchor="middle" style="pointer-events:none">'
+            f'{label}</text></g>'
+        )
+
+    nodes_json = json.dumps(nodes, ensure_ascii=False)
+    edges_json = json.dumps(edges, ensure_ascii=False)
 
     return f"""<!DOCTYPE html>
 <html lang="ja">
@@ -1173,34 +1269,40 @@ def _render_graph_html(graph_data: dict, title: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title} — Traceability Graph</title>
 <style>
-  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-         background: #1a1a2e; color: #e0e0e0; overflow: hidden; }}
-  #toolbar {{ position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-              background: rgba(26,26,46,0.95); padding: 10px 20px;
-              display: flex; align-items: center; gap: 12px;
-              border-bottom: 1px solid #333; backdrop-filter: blur(8px); }}
-  #toolbar h1 {{ font-size: 16px; font-weight: 600; white-space: nowrap; }}
-  #toolbar .badge {{ font-size: 11px; padding: 2px 8px; border-radius: 10px;
-                     background: #333; color: #aaa; }}
-  #toolbar input {{ flex: 1; max-width: 300px; padding: 6px 12px; border: 1px solid #444;
-                    border-radius: 6px; background: #16213e; color: #e0e0e0;
-                    font-size: 13px; outline: none; }}
-  #toolbar input:focus {{ border-color: #4a90d9; }}
-  #toolbar .legend {{ display: flex; gap: 16px; font-size: 12px; margin-left: auto; }}
-  .legend-item {{ display: flex; align-items: center; gap: 4px; }}
-  .legend-dot {{ width: 10px; height: 10px; border-radius: 2px; display: inline-block; }}
-  #mynetwork {{ position: fixed; top: 52px; left: 0; right: 0; bottom: 0; }}
-  #stats {{ position: fixed; bottom: 12px; right: 16px; z-index: 100;
-            font-size: 11px; color: #666; background: rgba(26,26,46,0.8);
-            padding: 4px 10px; border-radius: 6px; }}
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+         background:#1a1a2e; color:#e0e0e0; }}
+  #toolbar {{ position:fixed; top:0; left:0; right:0; z-index:100;
+              background:rgba(26,26,46,0.95); padding:10px 20px;
+              display:flex; align-items:center; gap:12px;
+              border-bottom:1px solid #333; backdrop-filter:blur(8px); }}
+  #toolbar h1 {{ font-size:16px; font-weight:600; white-space:nowrap; }}
+  #toolbar .badge {{ font-size:11px; padding:2px 8px; border-radius:10px;
+                     background:#333; color:#aaa; }}
+  #toolbar input {{ flex:1; max-width:300px; padding:6px 12px; border:1px solid #444;
+                    border-radius:6px; background:#16213e; color:#e0e0e0;
+                    font-size:13px; outline:none; }}
+  #toolbar input:focus {{ border-color:#4a90d9; }}
+  #toolbar .legend {{ display:flex; gap:16px; font-size:12px; margin-left:auto; }}
+  .legend-item {{ display:flex; align-items:center; gap:4px; }}
+  .legend-dot {{ width:10px; height:10px; border-radius:2px; display:inline-block; }}
+  #graph-container {{ position:fixed; top:52px; left:0; right:0; bottom:0; overflow:hidden; }}
+  #graph-container svg {{ width:100%; height:100%; }}
+  .node:hover rect {{ filter:brightness(1.3); }}
+  #tooltip {{ position:fixed; display:none; z-index:200;
+              background:rgba(0,0,0,0.85); color:#fff; padding:8px 12px;
+              border-radius:6px; font-size:12px; max-width:400px;
+              border:1px solid #444; pointer-events:none; }}
+  #stats {{ position:fixed; bottom:12px; right:16px; z-index:100;
+            font-size:11px; color:#666; background:rgba(26,26,46,0.8);
+            padding:4px 10px; border-radius:6px; }}
 </style>
 </head>
 <body>
 <div id="toolbar">
   <h1>{title}</h1>
-  <span class="badge" id="nodeCount">0 nodes</span>
-  <span class="badge" id="edgeCount">0 edges</span>
+  <span class="badge" id="nodeCount">{len(nodes)} nodes</span>
+  <span class="badge" id="edgeCount">{len(edges)} edges</span>
   <input id="search" type="text" placeholder="Search nodes..." oninput="filterGraph(this.value)">
   <div class="legend">
     <span class="legend-item"><span class="legend-dot" style="background:#4a90d9"></span> Spec</span>
@@ -1210,84 +1312,173 @@ def _render_graph_html(graph_data: dict, title: str) -> str:
     <span class="legend-item"><span class="legend-dot" style="background:#e67e22"></span> Task</span>
   </div>
 </div>
-<div id="mynetwork"></div>
-<div id="stats">vis-network • click node to inspect • drag to explore</div>
+<div id="graph-container">
+<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
+    markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10" fill="#555"/></marker></defs>
+  <rect width="{W}" height="{H}" fill="transparent"/>
+  {"".join(svg_edges)}
+  {"".join(svg_nodes)}
+</svg>
+</div>
+<div id="tooltip"></div>
+<div id="stats">SVG • hover to inspect • drag to explore</div>
 
-<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <script>
-const nodesData = {nodes_json};
-const edgesData = {edges_json};
+(function() {{
+const nodes = {nodes_json};
+const edges = {edges_json};
 
-const nodes = new vis.DataSet(nodesData);
-const edges = new vis.DataSet(edgesData);
-
-const container = document.getElementById('mynetwork');
-const options = {{
-  autoResize: true,
-  height: '100%',
-  width: '100%',
-  layout: {{ improvedLayout: true }},
-  physics: {{
-    enabled: true,
-    solver: 'forceAtlas2Based',
-    forceAtlas2Based: {{ gravitationalConstant: -40, centralGravity: 0.005,
-                        springLength: 180, springConstant: 0.02,
-                        damping: 0.4 }},
-    stabilization: {{ iterations: 200 }}
-  }},
-  interaction: {{
-    hover: true,
-    tooltipDelay: 200,
-    navigationButtons: true,
-    keyboard: true
-  }},
-  edges: {{
-    smooth: {{ type: 'continuous' }},
-    font: {{ size: 10, color: '#888', strokeWidth: 0 }},
-    arrows: {{ to: {{ enabled: true, scaleFactor: 0.8 }} }}
-  }},
-  groups: {{
-    spec: {{ shape: 'box', color: {{ background: '#4a90d9', border: '#2c5f9e' }} }},
-    code: {{ shape: 'box', color: {{ background: '#50b86c', border: '#2e7d46' }} }},
-    test: {{ shape: 'box', color: {{ background: '#e8a838', border: '#b57c1e' }} }},
-    design: {{ shape: 'box', color: {{ background: '#9b59b6', border: '#6c3483' }} }},
-    task: {{ shape: 'box', color: {{ background: '#e67e22', border: '#a85d16' }} }}
-  }}
-}};
-
-const network = new vis.Network(container, {{ nodes, edges }}, options);
-
-document.getElementById('nodeCount').textContent = nodes.length + ' nodes';
-document.getElementById('edgeCount').textContent = edges.length + ' edges';
-
-network.on('click', function(params) {{
-  if (params.nodes.length > 0) {{
-    network.focus(params.nodes[0], {{ scale: 1.5, animation: true }});
-  }}
+// Search filter
+document.getElementById('search').addEventListener('input', function() {{
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.node').forEach(g => {{
+    const label = g.querySelector('text')?.textContent?.toLowerCase() || '';
+    const title = (g.dataset.title || '').toLowerCase();
+    g.style.display = (label.includes(q) || title.includes(q)) ? '' : 'none';
+  }});
 }});
 
-function filterGraph(query) {{
-  if (!query) {{
-    nodes.forEach(n => nodes.update({{ id: n.id, hidden: false }}));
-    return;
-  }}
-  const q = query.toLowerCase();
-  nodes.forEach(n => {{
-    const match = (n.label && n.label.toLowerCase().includes(q)) ||
-                  (n.title && n.title.toLowerCase().includes(q));
-    nodes.update({{ id: n.id, hidden: !match }});
+// Hover tooltip
+document.querySelectorAll('.node').forEach(g => {{
+  g.addEventListener('mouseenter', function(e) {{
+    const title = this.dataset.title || this.querySelector('text')?.textContent || '';
+    const tip = document.getElementById('tooltip');
+    tip.textContent = title.replace(/<br\\s*\\/?>/gi, ' · ').replace(/<\\/?[^>]+>/g, '');
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 10) + 'px';
   }});
-}}
+  g.addEventListener('mousemove', function(e) {{
+    const tip = document.getElementById('tooltip');
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 10) + 'px';
+  }});
+  g.addEventListener('mouseleave', function() {{
+    document.getElementById('tooltip').style.display = 'none';
+  }});
+}});
 
+// Keyboard: Escape clears search
 document.addEventListener('keydown', function(e) {{
   if (e.key === 'Escape') {{
     document.getElementById('search').value = '';
-    filterGraph('');
+    document.getElementById('search').dispatchEvent(new Event('input'));
   }}
 }});
+
+// SVG pan/zoom via mouse drag
+let isPanning = false, panStart = {{x:0,y:0}}, panOffset = {{x:0,y:0}};
+const svg = document.querySelector('svg');
+const viewbox = svg.viewBox.baseVal;
+svg.addEventListener('mousedown', function(e) {{
+  if (e.target.tagName === 'rect' || e.target.tagName === 'text') return;
+  isPanning = true;
+  panStart.x = e.clientX;
+  panStart.y = e.clientY;
+}});
+window.addEventListener('mousemove', function(e) {{
+  if (!isPanning) return;
+  const dx = panStart.x - e.clientX;
+  const dy = panStart.y - e.clientY;
+  viewbox.x += dx;
+  viewbox.y += dy;
+  panStart.x = e.clientX;
+  panStart.y = e.clientY;
+}});
+window.addEventListener('mouseup', function() {{ isPanning = false; }});
+svg.addEventListener('wheel', function(e) {{
+  e.preventDefault();
+  const scale = e.deltaY > 0 ? 1.1 : 0.9;
+  const cx = viewbox.x + viewbox.width / 2;
+  const cy = viewbox.y + viewbox.height / 2;
+  viewbox.width = Math.max(100, Math.min(5000, viewbox.width * scale));
+  viewbox.height = Math.max(100, Math.min(5000, viewbox.height * scale));
+  viewbox.x = cx - viewbox.width / 2;
+  viewbox.y = cy - viewbox.height / 2;
+}});
+}})();
 </script>
 </body>
 </html>"""
+
+
+def _compute_force_layout(nodes: list[dict], edges: list[dict],
+                          iterations: int = 300, width: float = 800,
+                          height: float = 600) -> dict[str, tuple[float, float]]:
+    """単純な力指向レイアウトを Python で計算する。"""
+    import math
+    import random
+
+    pos: dict[str, list[float]] = {}
+    vel: dict[str, list[float]] = {}
+    node_ids = [n["id"] for n in nodes]
+
+    # 初期位置（円形に配置）
+    angle_step = 2 * math.pi / max(len(node_ids), 1)
+    for i, nid in enumerate(node_ids):
+        angle = i * angle_step
+        pos[nid] = [width / 2 + math.cos(angle) * 200,
+                    height / 2 + math.sin(angle) * 200]
+        vel[nid] = [0.0, 0.0]
+
+    # 隣接リスト
+    adj: dict[str, set[str]] = {nid: set() for nid in node_ids}
+    for e in edges:
+        frm, to = e.get("from"), e.get("to")
+        if frm in adj and to in adj:
+            adj[frm].add(to)
+            adj[to].add(frm)
+
+    # 力指向計算
+    for _ in range(iterations):
+        forces: dict[str, list[float]] = {nid: [0.0, 0.0] for nid in node_ids}
+        repulsion = 5000.0
+        attraction = 0.005
+        damping = 0.85
+
+        # 反発力（全ノード間）
+        for i, a in enumerate(node_ids):
+            for b in node_ids[i + 1:]:
+                dx = pos[a][0] - pos[b][0]
+                dy = pos[a][1] - pos[b][1]
+                dist = max(math.hypot(dx, dy), 10)
+                fx = repulsion / (dist * dist) * (dx / dist)
+                fy = repulsion / (dist * dist) * (dy / dist)
+                forces[a][0] += fx
+                forces[a][1] += fy
+                forces[b][0] -= fx
+                forces[b][1] -= fy
+
+        # 引力（エッジで接続されたノード間）
+        for e in edges:
+            frm, to = e.get("from"), e.get("to")
+            if frm not in pos or to not in pos:
+                continue
+            dx = pos[to][0] - pos[frm][0]
+            dy = pos[to][1] - pos[frm][1]
+            dist = max(math.hypot(dx, dy), 10)
+            fx = dx * attraction
+            fy = dy * attraction
+            forces[frm][0] += fx
+            forces[frm][1] += fy
+            forces[to][0] -= fx
+            forces[to][1] -= fy
+
+        # 中心引力
+        cx, cy = width / 2, height / 2
+        for nid in node_ids:
+            forces[nid][0] -= (pos[nid][0] - cx) * 0.001
+            forces[nid][1] -= (pos[nid][1] - cy) * 0.001
+
+        # 速度更新
+        for nid in node_ids:
+            vel[nid][0] = (vel[nid][0] + forces[nid][0]) * damping
+            vel[nid][1] = (vel[nid][1] + forces[nid][1]) * damping
+            pos[nid][0] += vel[nid][0]
+            pos[nid][1] += vel[nid][1]
+
+    return {nid: (pos[nid][0], pos[nid][1]) for nid in node_ids}
 
 
 def cmd_graph(mappings: list[dict], result: dict, output_path: str = "trace-graph.html",
