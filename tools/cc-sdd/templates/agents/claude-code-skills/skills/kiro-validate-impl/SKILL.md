@@ -108,7 +108,7 @@ For each detected feature:
   ```bash
   python3 .agents/scripts/check-trace-completeness.py --project-dir <project-root>
   ```
-- Run `check-trace-completeness.py --help` for available checks and options
+- Run `check-trace-completeness.py --help` for available checks and options (9 checks including @verifies test traceability)
 - If any check fails → flag as Critical (missing traceability = features not linked to specs)
 - If `.trace-mapping.yaml` doesn't exist but the project uses cc-sdd specs → flag as Warning (traceability not configured)
 

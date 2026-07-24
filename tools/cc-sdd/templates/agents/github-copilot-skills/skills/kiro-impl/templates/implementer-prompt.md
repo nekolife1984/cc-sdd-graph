@@ -55,6 +55,11 @@ Before self-review, tag each changed file and update spec documents with traceab
 - Place the tag near the function/class that implements the requirement
 - If the file belongs to a module, add `# @module <module-name>` (e.g., `# @module auth`)
 
+**Test files**: Add `# @verifies X.Y` comments to each test function or test file that validates a requirement:
+- Place the tag near the test function or at the top of the test file
+- Example: `# @verifies 1.1` in a test for requirement 1.1
+- Multiple requirements per test: `# @verifies 1.1, 1.2`
+
 **Spec documents** (if working on requirements.md or design.md):
 - Add `<!-- @spec X.Y -->` before each requirement heading in `requirements.md`
 - Add `<!-- @design ComponentName -->` before each component section in `design.md`
@@ -75,7 +80,7 @@ Before self-review, tag each changed file and update spec documents with traceab
 - Verify the tests prove the required behavior, not just scaffolding or a happy-path shell
 - Verify that any namespace or qualified-name access used at runtime (for example `React.X`, `module.Foo`, `pkg.Bar`) has a real value import or runtime binding, not only a type-only import or ambient type reference
 - Verify that any newly introduced runtime-sensitive dependency or packaging assumption (native modules, module-format boundaries, generated assets, required env vars, boot-time config) is reflected in validation or called out explicitly in `CONCERNS`
-- **Verify traceability tags** — confirm `# @impl X.Y` is present for every requirement section this task satisfies, and that spec docs (`requirements.md`/`design.md`) have corresponding `<!-- @spec -->`, `<!-- @design -->`, `<!-- @satisfies -->` tags if modified
+- **Verify traceability tags** — confirm `# @impl X.Y` is present for every requirement section this task satisfies, `# @verifies X.Y` for tests, and that spec docs (`requirements.md`/`design.md`) have corresponding `<!-- @spec -->`, `<!-- @design -->`, `<!-- @satisfies -->` tags if modified
 - If any review check fails, fix the implementation, re-run validation, and repeat this step
 
 ## Critical Constraints

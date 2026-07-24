@@ -29,6 +29,7 @@ Checks:
   6. depends   — _Depends:_ 構文チェック
   7. spec      — @spec ↔ .trace-mapping.yaml 完全性（requirements.md）
   8. design    — @design + @satisfies ↔ .trace-mapping.yaml 完全性（design.md）
+  9. test      — @verifies ↔ .trace-mapping.yaml 完全性（テストファイル）
 """
 
 import argparse
@@ -56,6 +57,7 @@ EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb", ".java",
 IMPL_TAG_RE = re.compile(r'#\s*@impl\s+(.+?)(?:\s*$|#)', re.MULTILINE)
 MODULE_TAG_RE = re.compile(r'#\s*@module\s+(.+?)(?:\s*$|#)', re.MULTILINE)
 FEATURE_TAG_RE = re.compile(r'#\s*@feature\s+(.+?)(?:\s*$|#)', re.MULTILINE)
+VERIFIES_TAG_RE = re.compile(r'#\s*@verifies\s+(.+?)(?:\s*$|#)', re.MULTILINE)
 
 # シンボルパターン（関数・クラス定義）
 SYMBOL_RE = re.compile(
@@ -78,6 +80,19 @@ BOUNDARY_RE = re.compile(r'_Boundary:\s*(.+?)(?:\s*$|_)')
 SPEC_TAG_RE = re.compile(r'<!--\s*@spec\s+(.+?)\s*-->', re.MULTILINE)
 DESIGN_TAG_RE = re.compile(r'<!--\s*@design\s+(.+?)\s*-->', re.MULTILINE)
 SATISFIES_TAG_RE = re.compile(r'<!--\s*@satisfies\s+(.+?)\s*-->', re.MULTILINE)
+
+# テストファイルパターン（全言語対応）
+TEST_FILE_PATTERNS = [
+    "**/test_*.py", "**/*_test.py",        # Python (pytest)
+    "**/*.test.ts", "**/*.test.tsx",       # TypeScript (vitest/jest)
+    "**/*.spec.ts", "**/*.spec.tsx",       # TypeScript (vitest/jest)
+    "**/*_test.go",                         # Go
+    "**/*_test.rs", "**/*_test.rs",        # Rust
+    "**/*Test*.java",                       # Java (JUnit)
+    "**/*Test*.kt",                         # Kotlin
+    "**/*Test*.swift",                      # Swift (XCTest)
+    "**/*Test*.rb", "**/*_test.rb",         # Ruby (RSpec)
+]
 
 
 # ── ユーティリティ ──
@@ -532,6 +547,55 @@ def check_design_tags(project_dir: Path, mappings: list[dict]) -> list[str]:
     return issues
 
 
+def check_test_trace(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    Check 9: @verifies ↔ .trace-mapping.yaml 完全性
+    - テストファイルの # @verifies X.Y が .trace-mapping.yaml にエントリを持つか
+    - .trace-mapping.yaml の各エントリに tests または @verifies があるか
+    """
+    issues = []
+    mapped_ids = {m.get("id", "") for m in mappings if m.get("id")}
+    if not mapped_ids:
+        return []
+
+    # テストファイルをスキャンして @verifies タグを収集
+    verifies_in_tests: dict[str, list[str]] = {}  # req_id → [test_file]
+    for pattern in TEST_FILE_PATTERNS:
+        for fpath in sorted(project_dir.glob(pattern)):
+            try:
+                content = fpath.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for match in VERIFIES_TAG_RE.finditer(content):
+                req_ids = [i.strip() for i in match.group(1).replace("，", ",").split(",") if i.strip()]
+                for rid in req_ids:
+                    verifies_in_tests.setdefault(rid, []).append(str(fpath))
+
+    # チェックA: @verifies があるのに .trace-mapping.yaml にエントリがない
+    for rid, files in sorted(verifies_in_tests.items()):
+        if rid not in mapped_ids:
+            file_list = ", ".join(str(Path(f).relative_to(project_dir)) for f in files[:3])
+            suffix = "..." if len(files) > 3 else ""
+            issues.append(
+                f"[test] @verifies {rid}: テスト ({file_list}{suffix}) にタグがあるが、"
+                f".trace-mapping.yaml に対応するエントリがない"
+            )
+
+    # チェックB: .trace-mapping.yaml に @impl エントリがあるのに @verifies がない
+    for m in mappings:
+        mid = m.get("id", "")
+        tags = m.get("tags", [])
+        if mid and "@impl" in tags and mid not in verifies_in_tests:
+            tests_from_mapping = m.get("tests", [])
+            if not tests_from_mapping:
+                issues.append(
+                    f"[test] .trace-mapping.yaml id={mid}: @impl エントリがあるが、"
+                    f"テストに @verifies {mid} が見つからない（tests: フィールドも空）"
+                )
+
+    return issues
+
+
 # ── メイン ──
 
 AVAILABLE_CHECKS = {
@@ -543,6 +607,7 @@ AVAILABLE_CHECKS = {
     "depends": check_depends_syntax,
     "spec": check_spec_tags,
     "design": check_design_tags,
+    "test": check_test_trace,
 }
 
 
@@ -589,14 +654,14 @@ def main():
 
     if not has_mapping:
         print(f"\u2139\ufe0f  .trace-mapping.yaml が見つかりません — "
-              f"impl/files/symbols/module/spec/design チェックはスキップされます")
+              f"impl/files/symbols/module/spec/design/test チェックはスキップされます")
 
     total_issues = 0
     any_failed = False
 
     for check_name in selected:
         # mapping が必要なチェックはスキップ
-        if check_name in ("impl", "files", "symbols", "module", "spec", "design") and not has_mapping:
+        if check_name in ("impl", "files", "symbols", "module", "spec", "design", "test") and not has_mapping:
             if args.verbose:
                 print(f"  ⏭️  {check_name}: スキップ（.trace-mapping.yaml なし）")
             continue

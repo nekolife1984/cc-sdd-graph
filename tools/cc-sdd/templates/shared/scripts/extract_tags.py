@@ -9,7 +9,7 @@ Usage:
   python3 .agents/scripts/extract_tags.py --dir strands-chat/ --check-missing
 
 対応タグ:
-  コード:  # @impl 1.1    # @module auth    # @feature login
+  Code tags:    # @impl 1.1    # @module auth    # @feature login    # @verifies 1.1
   仕様書:  <!-- @spec 1.1 -->  <!-- @design AuthService -->  <!-- @satisfies 1.1, 1.2 -->
 
 オプション:
@@ -62,9 +62,9 @@ def extract_tags_from_file(filepath: Path) -> list[dict]:
             "value": match.group("value").strip().rstrip(","),
         })
 
-    # 2. HTMLコメントを除去してからコードタグ（# @impl, # @module, # @feature）を抽出
+    # 2. HTMLコメントを除去してからコードタグ（# @impl, # @module, # @feature, # @verifies）を抽出
     content_no_html = re.sub(r'<!--.*?-->', '', content, flags=re.MULTILINE | re.DOTALL)
-    code_re = re.compile(r'#\s*@(?P<tag>impl|module|feature)\s+(?P<value>.+?)(?:\s*$|#)', re.MULTILINE)
+    code_re = re.compile(r'#\s*@(?P<tag>impl|module|feature|verifies)\s+(?P<value>.+?)(?:\s*$|#)', re.MULTILINE)
     for match in code_re.finditer(content_no_html):
         tags.append({
             "file": str(filepath),

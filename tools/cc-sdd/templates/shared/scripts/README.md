@@ -110,11 +110,11 @@ python3 .agents/scripts/impact.py --list
 
 | スクリプト | 役割 | 使用タイミング |
 |-----------|------|--------------|
-| `extract_tags.py` | コードから `@impl`/`@module`/`@feature`、仕様書から `@spec`/`@design`/`@satisfies` タグを抽出 | 調査・分析時 |
+| `extract_tags.py` | コードから `@impl`/`@module`/`@feature`/`@verifies`、仕様書から `@spec`/`@design`/`@satisfies` タグを抽出 | 調査・分析時 |
 | `impact.py` | 仕様↔コードの双方向影響分析 | 変更前に影響範囲を確認 |
 | `check_drift.py` | スナップショットベースのドリフト検出 | CI / pre-commit / cron |
 | `pre-commit.sh` | pre-commit hook（スナップショット自動更新） | コミット時 |
-| `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（@impl, code.files, code.symbols, @module, _Requirements:_, _Depends:_, @spec, @design, @satisfies） | 実装完了時 / CI |
+| `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（@impl, code.files, code.symbols, @module, _Requirements:_, _Depends:_, @spec, @design, @satisfies, @verifies） | 実装完了時 / CI |
 
 ## よくある使い方
 
