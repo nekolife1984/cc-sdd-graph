@@ -113,7 +113,8 @@ python3 .agents/scripts/impact.py --list
 | `extract_tags.py` | コードから `@impl`/`@module`/`@feature` タグを抽出 | 調査・分析時 |
 | `impact.py` | 仕様↔コードの双方向影響分析 | 変更前に影響範囲を確認 |
 | `check_drift.py` | スナップショットベースのドリフト検出 | CI / pre-commit / cron |
-| `pre-commit.sh` | pre-commit hook（スナップショット自動更新） | コミット時 |
+| `check-impl-completeness.py` | `.trace-mapping.yaml` vs コードの `@impl` タグ完全性チェック | pre-commit / CI / 任意実行 |
+| `pre-commit.sh` | pre-commit hook（`@impl` 完全性チェック + スナップショット更新） | コミット時 |
 
 ## よくある使い方
 
@@ -141,6 +142,15 @@ python3 .agents/scripts/check_drift.py --diff --gate
 
 # @impl タグが欠けてるファイルを警告
 python3 .agents/scripts/extract_tags.py --check-missing
+
+# .trace-mapping.yaml とコードの @impl 完全性チェック（推奨）
+python3 .agents/scripts/check-impl-completeness.py
+
+# 全ソースファイルの @impl 有無も含めてチェック
+python3 .agents/scripts/check-impl-completeness.py --check-all-sources
+
+# JSON 出力
+python3 .agents/scripts/check-impl-completeness.py --format json
 
 # .trace-mapping.yaml 追記形式でタグ出力
 python3 .agents/scripts/extract_tags.py --trace-mapping
