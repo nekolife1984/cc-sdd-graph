@@ -111,8 +111,74 @@ def run_crg_query(tool: str, params: dict) -> Optional[dict]:
         except (FileNotFoundError, json.JSONDecodeError, subprocess.TimeoutExpired):
             pass
 
-    print("[CRG] No CRG hook available (set CRG_HOOK env or install crg-query CLI)", file=sys.stderr)
+    # Fallback: code-review-graph query CLI (installed via setup-crg.sh)
+    # Map CRG MCP tool names to code-review-graph query subcommands
+    crg_cli = shutil.which("code-review-graph")
+    if crg_cli:
+        query_map = {
+            "query_graph_tool": {
+                "callers_of": "callers_of", "callees_of": "callees_of",
+                "imports_of": "imports_of", "tests_for": "tests_for",
+            },
+        }
+        # Try direct query_graph_tool mapping
+        if tool == "query_graph_tool":
+            pattern = params.get("pattern", "")
+            if pattern in query_map["query_graph_tool"]:
+                target = params.get("target", params.get("symbol", ""))
+                if target:
+                    subcmd = query_map["query_graph_tool"][pattern]
+                    return _run_crg_cli_query(subcmd, target, crg_cli)
+
+        # get_impact_radius_tool: collect callers + callees + importers
+        if tool == "get_impact_radius_tool":
+            symbol = params.get("symbol", "")
+            if symbol:
+                result = {"symbol": symbol, "callers": [], "callees": [], "importers": []}
+                cr = _run_crg_cli_query("callers_of", symbol, crg_cli)
+                if cr: result["callers"] = cr
+                cr = _run_crg_cli_query("callees_of", symbol, crg_cli)
+                if cr: result["callees"] = cr
+                cr = _run_crg_cli_query("importers_of", symbol, crg_cli)
+                if cr: result["importers"] = cr
+                return result
+
+        # get_affected_flows_tool: callers + callees
+        if tool == "get_affected_flows_tool":
+            target = params.get("target", params.get("symbol", ""))
+            if target:
+                result = {"target": target, "callers": [], "callees": []}
+                cr = _run_crg_cli_query("callers_of", target, crg_cli)
+                if cr: result["callers"] = cr
+                cr = _run_crg_cli_query("callees_of", target, crg_cli)
+                if cr: result["callees"] = cr
+                return result
+
+        # semantic_search_nodes_tool: file_summary
+        if tool == "semantic_search_nodes_tool":
+            query = params.get("query", params.get("symbol", ""))
+            if query:
+                result = _run_crg_cli_query("file_summary", query, crg_cli)
+                if result is not None:
+                    return {"results": result if isinstance(result, list) else [result]}
+
+    print("[CRG] No CRG tool available (pip install code-review-graph && code-review-graph build)",
+          file=sys.stderr)
     return None
+
+
+def _run_crg_cli_query(subcommand: str, target: str, cli_path: str) -> Optional[Any]:
+    """Run a single code-review-graph query subcommand."""
+    try:
+        result = subprocess.run(
+            [cli_path, "query", subcommand, target, "--json"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout)
+        return None
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+        return None
 
 
 def impact_from_spec(mappings: list[dict], spec_id: str, use_crg: bool = False) -> dict:

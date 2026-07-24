@@ -122,6 +122,35 @@ if [ -f "$TRACE_EXAMPLE" ] && [ ! -f "$TRACE_TARGET" ]; then
   ok "Created .trace-mapping.yaml from example"
 fi
 
+# Set up pre-commit hook
+info "Optional: Setting up pre-commit hook for automatic snapshot updates..."
+if [ -f "$PROJECT_ROOT/.git/hooks/pre-commit" ]; then
+  ok "pre-commit hook already exists"
+else
+  HOOK_SRC="$SCRIPT_DIR/pre-commit.sh"
+  HOOK_DST="$PROJECT_ROOT/.git/hooks/pre-commit"
+  if [ -f "$HOOK_SRC" ] && [ -d "$PROJECT_ROOT/.git/hooks" ]; then
+    if [ "$YES" = true ]; then
+      ln -sf "$HOOK_SRC" "$HOOK_DST"
+      ok "pre-commit hook linked (auto-mode)"
+    else
+      echo ""
+      echo "  Set up pre-commit hook to auto-update traceability snapshot?"
+      echo "  This runs check_drift.py --snapshot on every git commit."
+      echo -n "  Link hook? (Y/n): "
+      read -r HOOK_CHOICE
+      if [ -z "$HOOK_CHOICE" ] || [ "$HOOK_CHOICE" = "y" ] || [ "$HOOK_CHOICE" = "Y" ]; then
+        ln -sf "$HOOK_SRC" "$HOOK_DST"
+        ok "pre-commit hook linked"
+      else
+        info "Skipped. To set up later: ln -sf $HOOK_SRC $HOOK_DST"
+      fi
+    fi
+  else
+    warn "Cannot find pre-commit.sh or .git/hooks/ directory. Skipping pre-commit setup."
+  fi
+fi
+
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo -e "${GREEN}  Setup Complete!${NC}"

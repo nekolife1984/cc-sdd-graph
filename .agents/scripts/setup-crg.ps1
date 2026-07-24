@@ -110,6 +110,28 @@ if (-not $SkipBuild) {
     } else { Write-Ok "Code graph built" }
 } else { Write-Info "Step 4/4: Skipped (-SkipBuild)" }
 
+# ── Step 5: Pre-commit hook ──
+Write-Info "Step 5/5: Setting up pre-commit hook..."
+$hookSrc = "$PSScriptRoot\pre-commit.sh"
+$hookDir = "$PROJECT_ROOT\.git\hooks"
+$hookDst = "$hookDir\pre-commit"
+if (Test-Path $hookDst) {
+    Write-Ok "pre-commit hook already exists"
+} elseif ((Test-Path $hookSrc) -and (Test-Path $hookDir)) {
+    if ($Yes) {
+        & cmd /c "mklink $hookDst $hookSrc" | Out-Null
+        Write-Ok "pre-commit hook linked (auto-mode)"
+    } else {
+        $choice = Read-Host "  Link pre-commit hook for auto snapshot updates? (Y/n)"
+        if ([string]::IsNullOrEmpty($choice) -or $choice -eq "y" -or $choice -eq "Y") {
+            & cmd /c "mklink $hookDst $hookSrc" | Out-Null
+            Write-Ok "pre-commit hook linked"
+        } else { Write-Info "Skipped." }
+    }
+} else {
+    Write-Warn "pre-commit.sh or .git/hooks/ not found. Skipping."
+}
+
 Write-Host ""
 Write-Host "═══════════════════════════════════════" -ForegroundColor Green
 Write-Host "  Setup Complete!" -ForegroundColor Green
