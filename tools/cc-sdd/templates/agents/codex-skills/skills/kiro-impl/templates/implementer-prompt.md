@@ -48,12 +48,19 @@ If any of these cannot be determined from the spec — the requirements are too 
 - Confirm the verification method from the Task Brief passes
 - If a validation command fails because of a pre-existing unrelated issue, report that precisely instead of masking it
 
-### Step 4.5: Add @impl Traceability Tags
-Before self-review, tag each changed file with the requirement sections you implemented:
+### Step 4.5: Add Traceability Tags
+Before self-review, tag each changed file and update spec documents with traceability markers:
 
-- Add `# @impl X.Y` comments to each changed file, using the exact section numbers from `requirements.md` (e.g., `# @impl 1.1, 1.2`)
+**Code files**: Add `# @impl X.Y` comments to each changed file, using the exact section numbers from `requirements.md` (e.g., `# @impl 1.1, 1.2`)
 - Place the tag near the function/class that implements the requirement
-- If `.trace-mapping.yaml` exists in the project root, run the trace completeness gate:
+- If the file belongs to a module, add `# @module <module-name>` (e.g., `# @module auth`)
+
+**Spec documents** (if working on requirements.md or design.md):
+- Add `<!-- @spec X.Y -->` before each requirement heading in `requirements.md`
+- Add `<!-- @design ComponentName -->` before each component section in `design.md`
+- Add `<!-- @satisfies X.Y -->` before each component section in `design.md` to declare which requirements it satisfies
+
+**Gate**: If `.trace-mapping.yaml` exists, run the trace completeness gate:
   ```bash
   python3 .agents/scripts/check-trace-completeness.py
   ```
@@ -68,7 +75,7 @@ Before self-review, tag each changed file with the requirement sections you impl
 - Verify the tests prove the required behavior, not just scaffolding or a happy-path shell
 - Verify that any namespace or qualified-name access used at runtime (for example `React.X`, `module.Foo`, `pkg.Bar`) has a real value import or runtime binding, not only a type-only import or ambient type reference
 - Verify that any newly introduced runtime-sensitive dependency or packaging assumption (native modules, module-format boundaries, generated assets, required env vars, boot-time config) is reflected in validation or called out explicitly in `CONCERNS`
-- **Verify @impl tags** — confirm `# @impl X.Y` is present for every requirement section this task satisfies
+- **Verify traceability tags** — confirm `# @impl X.Y` is present for every requirement section this task satisfies, and that spec docs (`requirements.md`/`design.md`) have corresponding `<!-- @spec -->`, `<!-- @design -->`, `<!-- @satisfies -->` tags if modified
 - If any review check fails, fix the implementation, re-run validation, and repeat this step
 
 ## Critical Constraints

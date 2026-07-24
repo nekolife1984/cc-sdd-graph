@@ -50,9 +50,15 @@ mappings:
 
 # 参考: コード内のタグ記法
 #
-#   # @impl 1.1, 1.2          ← この関数が要件 1.1 と 1.2 を実装
-#   # @module auth            ← このファイルは auth モジュール
-#   # @feature user-auth      ← このファイルは user-auth フィーチャー
+#   コード:
+#     # @impl 1.1, 1.2          ← この関数が要件 1.1 と 1.2 を実装
+#     # @module auth            ← このファイルは auth モジュール
+#     # @feature user-auth      ← このファイルは user-auth フィーチャー
+#
+#   仕様書（HTMLコメント）:
+#     <!-- @spec 1 -->           ← requirements.md の要件ID
+#     <!-- @design AuthService -->  ← design.md のコンポーネント名
+#     <!-- @satisfies 1.1, 1.2 -->  ← この設計が満たす要件ID
 #
 # スクリプト:
 #   extract_tags.py  → コードから @impl/@module/@feature タグを抽出

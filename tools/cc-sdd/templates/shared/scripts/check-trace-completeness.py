@@ -10,7 +10,7 @@ Usage:
   python3 .agents/scripts/check-trace-completeness.py
 
   # 特定のチェックのみ
-  python3 .agents/scripts/check-trace-completeness.py --check impl,files,symbols,module,requirements,depends
+  python3 .agents/scripts/check-trace-completeness.py --check impl,files,symbols,module,requirements,depends,spec,design
 
   # プロジェクトディレクトリを指定
   python3 .agents/scripts/check-trace-completeness.py --project-dir /path/to/project
@@ -27,6 +27,8 @@ Checks:
   4. module    — @module タグ網羅性
   5. requirements — _Requirements:_ → .trace-mapping.yaml トレース
   6. depends   — _Depends:_ 構文チェック
+  7. spec      — @spec ↔ .trace-mapping.yaml 完全性（requirements.md）
+  8. design    — @design + @satisfies ↔ .trace-mapping.yaml 完全性（design.md）
 """
 
 import argparse
@@ -72,6 +74,11 @@ DEPENDS_RE = re.compile(r'_Depends:\s*([\d.,\s]+)')
 # _Boundary: パターン
 BOUNDARY_RE = re.compile(r'_Boundary:\s*(.+?)(?:\s*$|_)')
 
+# 仕様書タグパターン（HTMLコメント）
+SPEC_TAG_RE = re.compile(r'<!--\s*@spec\s+(.+?)\s*-->', re.MULTILINE)
+DESIGN_TAG_RE = re.compile(r'<!--\s*@design\s+(.+?)\s*-->', re.MULTILINE)
+SATISFIES_TAG_RE = re.compile(r'<!--\s*@satisfies\s+(.+?)\s*-->', re.MULTILINE)
+
 
 # ── ユーティリティ ──
 
@@ -93,6 +100,17 @@ def find_tasks_mds(project_dir: Path) -> list[Path]:
     if not spec_dir.exists():
         return []
     return list(spec_dir.rglob("tasks.md"))
+
+
+def find_spec_mds(project_dir: Path) -> list[Path]:
+    """プロジェクト内の全 requirements.md / design.md をスキャンする。"""
+    spec_dir = project_dir / TASKS_MD_PATH
+    if not spec_dir.exists():
+        return []
+    results = []
+    results.extend(spec_dir.rglob("requirements.md"))
+    results.extend(spec_dir.rglob("design.md"))
+    return results
 
 
 def find_code_files(project_dir: Path, file_globs: list[str]) -> list[Path]:
@@ -421,6 +439,99 @@ def check_depends_syntax(project_dir: Path, mappings: list[dict]) -> list[str]:
     return issues
 
 
+def check_spec_tags(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    Check 7: @spec ↔ .trace-mapping.yaml 完全性
+    - requirements.md の <!-- @spec X.Y --> が対応する .trace-mapping.yaml エントリを持つか
+    - .trace-mapping.yaml の各エントリに対応する @spec タグがあるか
+    """
+    issues = []
+    spec_files = [p for p in find_spec_mds(project_dir) if p.name == "requirements.md"]
+    if not spec_files:
+        return []
+
+    mapped_ids = {m.get("id", "") for m in mappings if m.get("id")}
+    spec_tags_found: set[str] = set()
+
+    for spec_file in spec_files:
+        try:
+            content = spec_file.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+
+        for match in SPEC_TAG_RE.finditer(content):
+            spec_id = match.group(1).strip()
+            spec_tags_found.add(spec_id)
+            if spec_id not in mapped_ids:
+                rel = spec_file.relative_to(project_dir)
+                issues.append(
+                    f"[spec] {rel}: @spec {spec_id} が .trace-mapping.yaml に対応するエントリなし"
+                )
+
+    # 逆方向: .trace-mapping.yaml の各エントリに対応する @spec タグがあるか
+    for m in mappings:
+        mid = m.get("id", "")
+        tags = m.get("tags", [])
+        if mid and "@impl" in tags and mid not in spec_tags_found:
+            issues.append(
+                f"[spec] .trace-mapping.yaml id={mid} に requirements.md の @spec タグが見つからない"
+            )
+
+    return issues
+
+
+def check_design_tags(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    Check 8: @design + @satisfies ↔ .trace-mapping.yaml 完全性
+    - design.md の <!-- @design ComponentName --> が対応する .trace-mapping.yaml エントリを持つか
+    - design.md の <!-- @satisfies X.Y --> が対応する .trace-mapping.yaml エントリを持つか
+    """
+    issues = []
+    design_files = [p for p in find_spec_mds(project_dir) if p.name == "design.md"]
+    if not design_files:
+        return []
+
+    mapped_ids = {m.get("id", "") for m in mappings if m.get("id")}
+
+    for design_file in design_files:
+        try:
+            content = design_file.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+
+        # @design タグのチェック
+        # .trace-mapping.yaml の code.symbols のシンボル名と照合
+        all_symbols: set[str] = set()
+        for m in mappings:
+            for sym in m.get("code", {}).get("symbols", []):
+                all_symbols.add(sym.split(".")[0])
+
+        for match in DESIGN_TAG_RE.finditer(content):
+            comp_name = match.group(1).strip()
+            if comp_name not in all_symbols:
+                # 許容: コンポーネント名がシンボル名として code.symbols に存在しなくても
+                # モジュールの id として存在するか
+                module_id = f"module-{comp_name.lower()}"
+                if module_id not in mapped_ids:
+                    rel = design_file.relative_to(project_dir)
+                    issues.append(
+                        f"[design] {rel}: @design {comp_name} が "
+                        f".trace-mapping.yaml の code.symbols または module エントリに見つからない"
+                    )
+
+        # @satisfies タグのチェック
+        for match in SATISFIES_TAG_RE.finditer(content):
+            req_ids_str = match.group(1).strip()
+            for req_id in [i.strip() for i in req_ids_str.replace("，", ",").split(",") if i.strip()]:
+                if req_id not in mapped_ids:
+                    rel = design_file.relative_to(project_dir)
+                    issues.append(
+                        f"[design] {rel}: @satisfies {req_id} が .trace-mapping.yaml に対応するエントリなし"
+                    )
+
+    return issues
+
+
 # ── メイン ──
 
 AVAILABLE_CHECKS = {
@@ -430,6 +541,8 @@ AVAILABLE_CHECKS = {
     "module": check_module_tags,
     "requirements": check_requirements_trace,
     "depends": check_depends_syntax,
+    "spec": check_spec_tags,
+    "design": check_design_tags,
 }
 
 
@@ -475,15 +588,15 @@ def main():
     mappings = load_mapping(project_dir) if has_mapping else []
 
     if not has_mapping:
-        print(f"ℹ️  .trace-mapping.yaml が見つかりません — "
-              f"impl/files/symbols/module チェックはスキップされます")
+        print(f"\u2139\ufe0f  .trace-mapping.yaml が見つかりません — "
+              f"impl/files/symbols/module/spec/design チェックはスキップされます")
 
     total_issues = 0
     any_failed = False
 
     for check_name in selected:
         # mapping が必要なチェックはスキップ
-        if check_name in ("impl", "files", "symbols", "module") and not has_mapping:
+        if check_name in ("impl", "files", "symbols", "module", "spec", "design") and not has_mapping:
             if args.verbose:
                 print(f"  ⏭️  {check_name}: スキップ（.trace-mapping.yaml なし）")
             continue

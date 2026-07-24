@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""extract_tags.py — コードから @impl/@module/@feature タグを抽出する。
+'extract_tags.py — コードから @impl/@module/@feature タグ、'
+DOCSTRING = """extract_tags.py - コードから @impl/@module/@feature タグ、仕様書から @spec/@design/@satisfies タグを抽出する。
 
 Usage:
   python3 .agents/scripts/extract_tags.py --dir strands-chat/
   python3 .agents/scripts/extract_tags.py --file strands-chat/agency/engine.py
   python3 .agents/scripts/extract_tags.py --dir strands-chat/ --format json
   python3 .agents/scripts/extract_tags.py --dir strands-chat/ --check-missing
+
+対応タグ:
+  コード:  # @impl 1.1    # @module auth    # @feature login
+  仕様書:  <!-- @spec 1.1 -->  <!-- @design AuthService -->  <!-- @satisfies 1.1, 1.2 -->
 
 オプション:
   --dir <path>       再帰的にスキャンするディレクトリ
@@ -24,11 +29,13 @@ from typing import Optional
 
 
 # 対応ファイル拡張子
-EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb", ".java", ".kt", ".swift"}
+EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".rb", ".java", ".kt", ".swift", ".md"}
 
 # タグパターン: # @impl 1.1, 1.2 | # @module auth | # @feature login
+# HTMLコメント: <!-- @spec 1 --> <!-- @design Auth --> <!-- @satisfies 1.1, 1.2 -->
 TAG_RE = re.compile(
-    r"#\s*@(?P<tag>impl|module|feature)\s+(?P<value>.+?)(?:\s*$|#)",
+    r"(?:#\s*@(?P<tag>impl|module|feature)\s+(?P<value>.+?)(?:\s*$|#))|"
+    r"(?:<!--\s*@(?P<mdtag>spec|design|satisfies)\s+(?P<mdvalue>.+?)\s*-->)",
     re.MULTILINE,
 )
 
@@ -42,13 +49,24 @@ def extract_tags_from_file(filepath: Path) -> list[dict]:
 
     tags = []
     for match in TAG_RE.finditer(content):
+        # コードタグ: # @impl, # @module, # @feature
         tag_type = match.group("tag")
-        value = match.group("value").strip().rstrip(",")
-        tags.append({
-            "file": str(filepath),
-            "tag": tag_type,
-            "value": value,
-        })
+        if tag_type:
+            value = match.group("value").strip().rstrip(",")
+            tags.append({
+                "file": str(filepath),
+                "tag": tag_type,
+                "value": value,
+            })
+        # Markdown HTMLコメントタグ: <!-- @spec, @design, @satisfies -->
+        md_tag = match.group("mdtag")
+        if md_tag:
+            md_value = match.group("mdvalue").strip().rstrip(",")
+            tags.append({
+                "file": str(filepath),
+                "tag": md_tag,
+                "value": md_value,
+            })
     return tags
 
 
@@ -132,7 +150,7 @@ def format_trace_mapping(tags: list[dict]) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="コードから @impl/@module/@feature タグを抽出")
+    parser = argparse.ArgumentParser(description="コードから @impl/@module/@feature タグ、仕様書から @spec/@design/@satisfies タグを抽出")
     parser.add_argument("--dir", type=str, help="再帰的にスキャンするディレクトリ")
     parser.add_argument("--file", type=str, help="単一ファイルをスキャン")
     parser.add_argument("--format", choices=["text", "json"], default="text", help="出力形式")

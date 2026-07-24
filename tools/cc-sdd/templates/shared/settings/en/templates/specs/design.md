@@ -157,6 +157,8 @@ Group detailed blocks by domain or architectural layer. For each detailed compon
 
 ### [Domain / Layer]
 
+<!-- @design [Component Name] -->
+<!-- @satisfies 2.1, 2.3 -->
 #### [Component Name]
 
 | Field | Detail |
