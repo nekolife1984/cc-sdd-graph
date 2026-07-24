@@ -52,7 +52,7 @@ describe('real gemini-cli-skills manifest', () => {
     expect(out).toMatch(/Plan \(dry-run\)/);
     expect(out).toContain('[templateDir] skills: templates/agents/gemini-cli-skills/skills -> .gemini/skills');
     expect(out).toContain('[templateFile] doc_main: templates/agents/gemini-cli-skills/docs/GEMINI.md -> ./GEMINI.md');
-    expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/templates -> .kiro/settings/templates');
+    expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/en/templates -> .kiro/settings/templates');
     expect(out).toContain('[templateDir] gemini_agents');
   });
 

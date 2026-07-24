@@ -40,7 +40,7 @@ describe('real claude-code-skills manifest', () => {
     expect(out).toMatch(/Plan \(dry-run\)/);
     expect(out).toContain('[templateDir] skills: templates/agents/claude-code-skills/skills -> .claude/skills');
     expect(out).toContain('[templateFile] doc_main: templates/agents/claude-code-skills/docs/CLAUDE.md -> ./CLAUDE.md');
-    expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/templates -> .kiro/settings/templates');
+    expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/en/templates -> .kiro/settings/templates');
   });
 
   it('apply writes CLAUDE.md, skill files to cwd', async () => {

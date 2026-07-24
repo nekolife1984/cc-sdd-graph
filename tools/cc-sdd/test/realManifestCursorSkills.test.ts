@@ -52,7 +52,7 @@ describe('real cursor-skills manifest', () => {
     expect(out).toMatch(/Plan \(dry-run\)/);
     expect(out).toContain('[templateDir] skills: templates/agents/cursor-skills/skills -> .cursor/skills');
     expect(out).toContain('[templateFile] doc_main: templates/agents/cursor-skills/docs/AGENTS.md -> ./AGENTS.md');
-    expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/templates -> .kiro/settings/templates');
+    expect(out).toContain('[templateDir] settings_templates: templates/shared/settings/en/templates -> .kiro/settings/templates');
   });
 
   it('apply writes AGENTS.md, skill files, and settings to cwd', async () => {

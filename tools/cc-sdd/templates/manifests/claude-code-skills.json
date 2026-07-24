@@ -24,7 +24,7 @@
       "id": "settings_templates",
       "source": {
         "type": "templateDir",
-        "fromDir": "templates/shared/settings/templates",
+        "fromDir": "templates/shared/settings/{{LANG_CODE}}/templates",
         "toDir": "{{KIRO_DIR}}/settings/templates"
       },
       "when": { "agent": "claude-code-skills" }
