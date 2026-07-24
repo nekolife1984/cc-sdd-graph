@@ -33,15 +33,27 @@ Usage:
   # --band: バンドフィルターで結果を絞り込み
   python3 .agents/scripts/impact.py --spec-id 1.1 --band green
   python3 .agents/scripts/impact.py --quick --diff --band amber+
+
+  # --graph: 対話的HTMLグラフを生成
+  python3 .agents/scripts/impact.py --list --graph
+  python3 .agents/scripts/impact.py --spec-id 1.1 --graph trace-1.1.html
+  python3 .agents/scripts/impact.py --quick --diff --graph
+
+  # --serve: ブラウザで対話的グラフを表示
+  python3 .agents/scripts/impact.py --list --serve
+  python3 .agents/scripts/impact.py --spec-id 1.1 --serve
 """
 
 import argparse
+import http.server
 import json
 import os
 import re
 import shutil
+import socketserver
 import subprocess
 import sys
+import webbrowser
 from pathlib import Path
 from typing import Any, Optional
 
@@ -1049,6 +1061,278 @@ def _print_human(result: dict):
         _print_rename(result)
 
 
+# ── グラフ可視化 ──
+
+
+def _gather_graph_data(mappings: list[dict], result: dict) -> dict:
+    """マッピングと分析結果からグラフデータ（nodes, edges）を構築する。"""
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    seen_ids: set[str] = set()
+    node_id_counter: int = 0
+
+    def _add_node(label: str, group: str, file_path: str = "",
+                  band: str = "") -> str:
+        nonlocal node_id_counter
+        nid = f"n{node_id_counter}"
+        node_id_counter += 1
+
+        colors = {
+            "spec": {"bg": "#4a90d9", "border": "#2c5f9e", "text": "#fff"},
+            "code": {"bg": "#50b86c", "border": "#2e7d46", "text": "#fff"},
+            "test": {"bg": "#e8a838", "border": "#b57c1e", "text": "#fff"},
+            "design": {"bg": "#9b59b6", "border": "#6c3483", "text": "#fff"},
+            "task": {"bg": "#e67e22", "border": "#a85d16", "text": "#fff"},
+        }
+        band_bg = {"green": "#2ecc71", "amber": "#f39c12", "gray": "#95a5a6"}
+
+        c = colors.get(group, colors["spec"])
+        bg = band_bg.get(band, c["bg"])
+
+        if band:
+            title = f"<b>{label}</b><br/>band: {band}<br/>{file_path}"
+        elif file_path:
+            title = f"<b>{label}</b><br/>{file_path}"
+        else:
+            title = f"<b>{label}</b>"
+
+        nodes.append({
+            "id": nid,
+            "label": label if len(label) < 40 else label[:37] + "...",
+            "title": title,
+            "group": group,
+            "color": {"background": bg, "border": c["border"]},
+            "font": {"color": c["text"], "size": 14},
+            "shape": "box",
+            "physics": True,
+        })
+        return nid
+
+    # 全マッピングからノードを構築
+    for m in mappings:
+        mid = m.get("id", "")
+        spec_paths = m.get("spec", [])
+        code_files = m.get("code", {}).get("files", [])
+        symbols = m.get("code", {}).get("symbols", [])
+        tasks = m.get("tasks", [])
+        docs = m.get("docs", [])
+
+        if spec_paths:
+            spec_path = spec_paths[0] if isinstance(spec_paths, list) else spec_paths
+        else:
+            spec_path = ""
+
+        spec_nid = _add_node(f"Req {mid}", "spec", spec_path)
+
+        for cf in code_files:
+            cf_label = Path(cf).stem
+            band = ""
+            if result and "banded" in result:
+                for entry in (result["banded"].get("green", []) +
+                              result["banded"].get("amber", []) +
+                              result["banded"].get("gray", [])):
+                    if entry.get("file") and cf in entry["file"]:
+                        band = entry.get("band", "")
+                        break
+            cf_nid = _add_node(cf_label, "code", cf, band)
+            edges.append({"from": spec_nid, "to": cf_nid,
+                          "label": "@impl", "color": "#50b86c",
+                          "width": 2, "dashes": False})
+
+        for sym in symbols:
+            sym_nid = _add_node(sym[:30], "code", f"symbol: {sym}")
+            edges.append({"from": spec_nid, "to": sym_nid,
+                          "label": "symbol", "color": "#50b86c",
+                          "width": 1, "dashes": True})
+
+        for task in tasks:
+            task_nid = _add_node(str(task), "task")
+            edges.append({"from": spec_nid, "to": task_nid,
+                          "label": "task", "color": "#e67e22",
+                          "width": 1, "dashes": False})
+
+        for doc in docs:
+            doc_label = Path(doc).stem if doc else "doc"
+            doc_nid = _add_node(doc_label, "design", doc)
+            edges.append({"from": spec_nid, "to": doc_nid,
+                          "label": "doc", "color": "#9b59b6",
+                          "width": 1, "dashes": True})
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def _render_graph_html(graph_data: dict, title: str) -> str:
+    """グラフデータを vis-network を使った HTML にレンダリングする。"""
+    nodes_json = json.dumps(graph_data.get("nodes", []), ensure_ascii=False)
+    edges_json = json.dumps(graph_data.get("edges", []), ensure_ascii=False)
+
+    return f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title} — Traceability Graph</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         background: #1a1a2e; color: #e0e0e0; overflow: hidden; }}
+  #toolbar {{ position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+              background: rgba(26,26,46,0.95); padding: 10px 20px;
+              display: flex; align-items: center; gap: 12px;
+              border-bottom: 1px solid #333; backdrop-filter: blur(8px); }}
+  #toolbar h1 {{ font-size: 16px; font-weight: 600; white-space: nowrap; }}
+  #toolbar .badge {{ font-size: 11px; padding: 2px 8px; border-radius: 10px;
+                     background: #333; color: #aaa; }}
+  #toolbar input {{ flex: 1; max-width: 300px; padding: 6px 12px; border: 1px solid #444;
+                    border-radius: 6px; background: #16213e; color: #e0e0e0;
+                    font-size: 13px; outline: none; }}
+  #toolbar input:focus {{ border-color: #4a90d9; }}
+  #toolbar .legend {{ display: flex; gap: 16px; font-size: 12px; margin-left: auto; }}
+  .legend-item {{ display: flex; align-items: center; gap: 4px; }}
+  .legend-dot {{ width: 10px; height: 10px; border-radius: 2px; display: inline-block; }}
+  #mynetwork {{ position: fixed; top: 52px; left: 0; right: 0; bottom: 0; }}
+  #stats {{ position: fixed; bottom: 12px; right: 16px; z-index: 100;
+            font-size: 11px; color: #666; background: rgba(26,26,46,0.8);
+            padding: 4px 10px; border-radius: 6px; }}
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <h1>{title}</h1>
+  <span class="badge" id="nodeCount">0 nodes</span>
+  <span class="badge" id="edgeCount">0 edges</span>
+  <input id="search" type="text" placeholder="Search nodes..." oninput="filterGraph(this.value)">
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#4a90d9"></span> Spec</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#50b86c"></span> Code</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#e8a838"></span> Test</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#9b59b6"></span> Design</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#e67e22"></span> Task</span>
+  </div>
+</div>
+<div id="mynetwork"></div>
+<div id="stats">vis-network • click node to inspect • drag to explore</div>
+
+<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script>
+const nodesData = {nodes_json};
+const edgesData = {edges_json};
+
+const nodes = new vis.DataSet(nodesData);
+const edges = new vis.DataSet(edgesData);
+
+const container = document.getElementById('mynetwork');
+const options = {{
+  autoResize: true,
+  height: '100%',
+  width: '100%',
+  layout: {{ improvedLayout: true }},
+  physics: {{
+    enabled: true,
+    solver: 'forceAtlas2Based',
+    forceAtlas2Based: {{ gravitationalConstant: -40, centralGravity: 0.005,
+                        springLength: 180, springConstant: 0.02,
+                        damping: 0.4 }},
+    stabilization: {{ iterations: 200 }}
+  }},
+  interaction: {{
+    hover: true,
+    tooltipDelay: 200,
+    navigationButtons: true,
+    keyboard: true
+  }},
+  edges: {{
+    smooth: {{ type: 'continuous' }},
+    font: {{ size: 10, color: '#888', strokeWidth: 0 }},
+    arrows: {{ to: {{ enabled: true, scaleFactor: 0.8 }} }}
+  }},
+  groups: {{
+    spec: {{ shape: 'box', color: {{ background: '#4a90d9', border: '#2c5f9e' }} }},
+    code: {{ shape: 'box', color: {{ background: '#50b86c', border: '#2e7d46' }} }},
+    test: {{ shape: 'box', color: {{ background: '#e8a838', border: '#b57c1e' }} }},
+    design: {{ shape: 'box', color: {{ background: '#9b59b6', border: '#6c3483' }} }},
+    task: {{ shape: 'box', color: {{ background: '#e67e22', border: '#a85d16' }} }}
+  }}
+}};
+
+const network = new vis.Network(container, {{ nodes, edges }}, options);
+
+document.getElementById('nodeCount').textContent = nodes.length + ' nodes';
+document.getElementById('edgeCount').textContent = edges.length + ' edges';
+
+network.on('click', function(params) {{
+  if (params.nodes.length > 0) {{
+    network.focus(params.nodes[0], {{ scale: 1.5, animation: true }});
+  }}
+}});
+
+function filterGraph(query) {{
+  if (!query) {{
+    nodes.forEach(n => nodes.update({{ id: n.id, hidden: false }}));
+    return;
+  }}
+  const q = query.toLowerCase();
+  nodes.forEach(n => {{
+    const match = (n.label && n.label.toLowerCase().includes(q)) ||
+                  (n.title && n.title.toLowerCase().includes(q));
+    nodes.update({{ id: n.id, hidden: !match }});
+  }});
+}}
+
+document.addEventListener('keydown', function(e) {{
+  if (e.key === 'Escape') {{
+    document.getElementById('search').value = '';
+    filterGraph('');
+  }}
+}});
+</script>
+</body>
+</html>"""
+
+
+def cmd_graph(mappings: list[dict], result: dict, output_path: str = "trace-graph.html",
+              spec_id: str = "") -> str:
+    """対話的HTMLグラフを生成する。"""
+    graph_data = _gather_graph_data(mappings, result)
+    title = f"Traceability: {spec_id}" if spec_id else "Traceability Graph"
+    html = _render_graph_html(graph_data, title)
+    out = Path(output_path)
+    out.write_text(html, encoding="utf-8")
+    print(f"\n✅ Graph saved: {out.resolve()}")
+    print(f"   Open in browser: file://{out.resolve()}")
+    return str(out.resolve())
+
+
+def cmd_serve(mappings: list[dict], result: dict, port: int = 0,
+              spec_id: str = "") -> None:
+    """対話的グラフをHTTPサーバで起動しブラウザを開く。"""
+    graph_data = _gather_graph_data(mappings, result)
+    title = f"Traceability: {spec_id}" if spec_id else "Traceability Graph"
+    html = _render_graph_html(graph_data, title)
+
+    import tempfile
+    tmp = Path(tempfile.mkstemp(suffix=".html")[1])
+    tmp.write_text(html, encoding="utf-8")
+
+    if port == 0:
+        with socketserver.TCPServer(("", 0), http.server.SimpleHTTPRequestHandler) as s:
+            port = s.server_address[1]
+
+    output_path = tmp.resolve()
+    print(f"\n✅ Serving graph at http://localhost:{port}")
+    print(f"   (temp: {output_path})")
+    print("   Press Ctrl+C to stop\n")
+
+    webbrowser.open(f"http://localhost:{port}/{tmp.name}")
+
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n🛑 Server stopped")
+
+
 def main():
     parser = argparse.ArgumentParser(description="CRG + .trace-mapping.yaml 影響分析、または --quick 簡易影響分析")
     group = parser.add_mutually_exclusive_group(required=True)
@@ -1068,6 +1352,12 @@ def main():
                         help="バンドフィルター（green/amber/gray/green+/amber+）。指定したバンド以上の項目のみ表示")
     parser.add_argument("--project-dir", type=str, default=".",
                         help="プロジェクトルート（--quick モード用、デフォルト: カレント）")
+    parser.add_argument("--graph", nargs="?", const="trace-graph.html", default=None,
+                        metavar="FILE",
+                        help="対話的HTMLグラフを生成（--list / --spec-id / --file と併用）。"
+                             "ファイル名指定可（デフォルト: trace-graph.html）")
+    parser.add_argument("--serve", action="store_true",
+                        help="対話的グラフをHTTPサーバで起動しブラウザで開く")
     args = parser.parse_args()
 
     if args.crg_hook:
@@ -1115,11 +1405,33 @@ def main():
     if args.band and "banded" in result:
         filtered_files = _filter_by_band(result["banded"], args.band)
         result["files"] = filtered_files
-        # band_summary もフィルター後の値に更新
         filtered_summary = {"green": 0, "amber": 0, "gray": 0}
         for band_key in filtered_summary:
             filtered_summary[band_key] = len(result["banded"].get(band_key, []))
         result["band_summary"] = filtered_summary
+
+    # グラフモード（--graph / --serve）
+    if args.graph is not None or args.serve:
+        # マッピングデータを取得（結果になければ --list 相当で取得）
+        if "mappings" in result:
+            mappings = result["mappings"]
+        elif "mapping" in result:
+            mappings = [result["mapping"]]
+        else:
+            mappings = load_mapping(project_dir / TRACE_MAPPING_PATH)
+            if not mappings:
+                # quick モードの場合は空グラフ
+                mappings = []
+
+        spec_id = result.get("spec_id", args.spec_id or "")
+
+        if args.serve:
+            cmd_serve(mappings, result, spec_id=spec_id)
+            return
+        else:
+            output_path = args.graph if args.graph else "trace-graph.html"
+            cmd_graph(mappings, result, output_path, spec_id=spec_id)
+            return
 
     if args.json:
         print(json.dumps(result, indent=2, default=str))

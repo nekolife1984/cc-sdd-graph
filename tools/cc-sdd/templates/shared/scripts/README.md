@@ -185,14 +185,45 @@ python3 .agents/scripts/impact.py --spec-id 1.1 --json | jq '.band_summary'
 | スクリプト | 役割 | 使用タイミング |
 |-----------|------|--------------|
 | `extract_tags.py` | コードから `@impl`/`@module`/`@feature`/`@verifies`、仕様書から `@spec`/`@design`/`@satisfies` タグを抽出 | 調査・分析時 |
-| `impact.py` | 仕様↔コードの双方向影響分析（`--quick` で .trace-mapping.yaml 不要） | 変更前に影響範囲を確認 |
+| `impact.py` | 仕様↔コードの双方向影響分析（`--quick`/`--graph`/`--serve`） | 変更前・設計レビュー時 |
 | `check_drift.py` | スナップショットベースのドリフト検出 | CI / pre-commit / cron |
 | `pre-commit.sh` | pre-commit hook（スナップショット自動更新） | コミット時 |
-|| `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（9標準 + 2 P0 false-green） | 実装完了時 / CI |
+| `check-trace-completeness.py` | 包括的トレーサビリティ完全性チェック（9標準 + 3 P0） | 実装完了時 / CI |
+
+## グラフ可視化（--graph / --serve）
+
+`impact.py` で対話的なHTMLグラフを生成できる:
+
+```bash
+# 全マッピングをグラフ化（ファイル保存）
+python3 .agents/scripts/impact.py --list --graph
+
+# 特定の spec だけグラフ化
+python3 .agents/scripts/impact.py --spec-id 1.1 --graph spec-1.1.html
+
+# ファイル名指定なしでデフォルト名
+python3 .agents/scripts/impact.py --list --graph
+
+# ブラウザで即座に開く（サーバ起動）
+python3 .agents/scripts/impact.py --list --serve
+python3 .agents/scripts/impact.py --spec-id 1.1 --serve
+
+# Quick モードでも使える
+python3 .agents/scripts/impact.py --quick --diff --graph
+python3 .agents/scripts/impact.py --quick --spec-id 2.1 --graph
+```
+
+グラフの特徴:
+
+| 機能 | 説明 |
+|------|------|
+| 🔵 ノード色分け | Spec(青) / Code(緑) / Test(黄) / Design(紫) / Task(橙) |
+| 🟢🟡⚪ バンド色 | 影響度バンドがあるコードは色で区別（Green/Amber/Gray） |
+| 🔍 検索フィルター | 画面上部の検索ボックスでノードをリアルタイムフィルター |
+| 🖱️ 操作 | ドラッグで移動 / スクロールでズーム / クリックでフォーカス |
+| ⌨️ Esc | 検索クリア |
 
 ## False-Green ベクター品質管理
-
-`quality/` ディレクトリに false-green 対策の設計書と検出状況を管理している:
 
 ```bash
 # プロジェクトにコピーして使う
