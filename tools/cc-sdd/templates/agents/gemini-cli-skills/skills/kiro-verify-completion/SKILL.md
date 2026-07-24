@@ -90,6 +90,11 @@ Require:
 - cross-task integration assessment
 - design end-to-end alignment assessment
 - blocked tasks assessment
+- **CRG architecture alignment** (when code-review-graph is available):
+  - Run `code-review-graph query callers_of/callees_of` on key components from design.md
+  - Verify the actual call chain matches the architecture diagrams and component contracts
+  - Flag any unexpected dependencies, bypassed layers, or missing connections
+  - Include in evidence: `CRG_ALIGNMENT: PASS | WARN | FAIL`
 
 A passing test suite alone is not enough for `FEATURE_GO`.
 

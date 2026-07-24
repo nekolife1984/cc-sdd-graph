@@ -48,7 +48,18 @@ After all parallel research completes, synthesize findings for review.
    - Engage interactively with user — ask clarifying questions, propose alternatives
    - Use language specified in spec.json for output
 
-3. **Decision and Next Steps**:
+3. **CRG Code Verification** (when code-review-graph is available):
+   - Query each component listed in the design's Components and Interfaces section:
+     - `code-review-graph query file_summary <component>` — verify the component exists in code
+     - `code-review-graph query callers_of <component>` — verify expected dependencies exist
+     - `code-review-graph query callees_of <component>` — verify it's consumed as designed
+   - Report findings:
+     - ✅ Components found: all design components exist in the codebase
+     - ⚠️ Missing components: design.md mentions components not found in code
+     - ⚠️ Unexpected dependencies: actual call chains differ from design's architecture diagram
+   - Include these findings in the GO/NO-GO decision
+
+4. **Decision and Next Steps**:
    - Clear GO/NO-GO decision with rationale
    - Provide specific actionable next steps (see Next Phase below)
 
