@@ -26,7 +26,14 @@ This skill performs **code-originated impact analysis**. When a specific file or
    ```
    Quick mode greps `@impl`/`@spec`/`@verifies` tags directly from the codebase
    without a mapping file (brownfield-friendly).
-3. Interpret target from `$1`:
+3. **DAG transitive mode** (CRG replacement): If CRG MCP is not available but
+   `.kiro/graph/dag.json` exists, use `--dag` for transitive import analysis:
+   ```bash
+   python3 .agents/scripts/impact.py --spec-id 1.1 --dag
+   ```
+   Build DAG with: `python3 .agents/scripts/build-dag.py`
+   Supports 17 languages including C/C++/C# (// @impl syntax).
+4. Interpret target from `$1`:
    - File path (e.g., `src/ui/chat.py`) → single file analysis
    - `.` or `--diff` → git diff analysis
    - Empty → auto-detect files from last `/kiro-impl`

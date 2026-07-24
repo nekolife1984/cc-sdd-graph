@@ -27,7 +27,13 @@ This skill performs **spec-originated impact analysis**. When a specific require
    python3 .agents/scripts/impact.py --quick --spec-id $1 --project-dir .
    ```
    Quick mode greps `@impl`/`@verifies`/`@spec` tags directly from the codebase.
-3. Extract spec ID from argument `$1` (e.g., `1.1`, `6.2`).
+3. **DAG transitive mode** (CRG replacement): If CRG MCP is not available but
+   `.kiro/graph/dag.json` exists:
+   ```bash
+   python3 .agents/scripts/impact.py --spec-id $1 --dag
+   ```
+   This traces transitive imports (17 languages, including C/C++/C# with `// @impl`).
+4. Extract spec ID from argument `$1` (e.g., `1.1`, `6.2`).
 
 ## Step 2: CRG Code Graph Investigation
 
