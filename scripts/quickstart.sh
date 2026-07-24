@@ -1,18 +1,18 @@
 #!/bin/bash
-# quickstart.sh — cc-sdd-graph + CRG 一括セットアップ
+# quickstart.sh — One-command cc-sdd-graph + CRG setup
 #
 # Usage:
-#   # GitHub から直接実行（推奨）
+#   # Run directly from GitHub (recommended)
 #   bash <(curl -s https://raw.githubusercontent.com/nekolife1984/cc-sdd-graph/main/scripts/quickstart.sh)
 #
-#   # またはクローンしてから
+#   # Or clone first
 #   git clone https://github.com/nekolife1984/cc-sdd-graph.git
 #   bash cc-sdd-graph/scripts/quickstart.sh
 #
-# このスクリプトは以下を行います:
-#   1. cc-sdd-graph のインストール（スキル + テンプレート）
-#   2. code-review-graph のインストールとセットアップ
-#   3. .trace-mapping.yaml の初期化
+# This script:
+#   1. Installs cc-sdd-graph skills and templates
+#   2. Installs and configures code-review-graph
+#   3. Initializes .trace-mapping.yaml
 
 set -euo pipefail
 
@@ -27,7 +27,7 @@ ok()    { echo -e "${GREEN}✅ $1${NC}"; }
 warn()  { echo -e "${YELLOW}⚠️  $1${NC}"; }
 err()   { echo -e "${RED}❌ $1${NC}"; }
 
-# ── 設定 ──────────────────────────────────────────────
+# ── Config ─────────────────────────────────────────────
 GITHUB_REPO="nekolife1984/cc-sdd-graph"
 RAW_BASE="https://raw.githubusercontent.com/$GITHUB_REPO/main"
 REPO_URL="https://github.com/$GITHUB_REPO.git"
@@ -40,20 +40,18 @@ trap cleanup EXIT
 
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
-echo -e "${CYAN}  cc-sdd-graph + CRG セットアップ${NC}"
+echo -e "${CYAN}  cc-sdd-graph + CRG Setup${NC}"
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
 echo ""
 
-# ── Step 0: 前提確認 ──────────────────────────────────
-info "Step 0/4: 前提環境を確認中..."
+# ── Step 0: Prerequisites ──────────────────────────────
+info "Step 0/4: Checking prerequisites..."
 
-# Node.js
 if ! command -v node &>/dev/null; then
-  err "Node.js が見つかりません。https://nodejs.org からインストールしてください。"
+  err "Node.js not found. Install from https://nodejs.org"
   exit 1
 fi
 
-# Python
 PYTHON=""
 for cmd in python3 python; do
   if command -v "$cmd" &>/dev/null; then
@@ -62,38 +60,31 @@ for cmd in python3 python; do
   fi
 done
 if [ -z "$PYTHON" ]; then
-  err "Python が見つかりません。https://python.org からインストールしてください。"
+  err "Python not found. Install from https://python.org"
   exit 1
 fi
 
-# npx
 if ! command -v npx &>/dev/null; then
-  err "npx が見つかりません。npm install -g npx を実行してください。"
+  err "npx not found. Run: npm install -g npx"
   exit 1
 fi
 
-ok "Node.js $($PYTHON --version 2>&1 || true), $($PYTHON --version 2>&1), npx 利用可能"
+ok "Node.js, Python ($($PYTHON --version 2>&1 || true)), npx available"
 
-# ── Step 1: cc-sdd-graph インストール ─────────────────
-info "Step 1/4: cc-sdd-graph をインストール中..."
+# ── Step 1: Install cc-sdd-graph ────────────────────────
+info "Step 1/4: Installing cc-sdd-graph..."
 
 echo ""
-echo -e "  cc-sdd-graph がプロジェクトにスキルとテンプレートを"
-echo -e "  インストールします。使用するエージェントと言語を"
-echo -e "  選択してください。"
-echo ""
-
-# 対話的にエージェント選択
-echo -e "  エージェントを選択:"
-echo -e "  [1] Claude Code（デフォルト）"
-echo -e "  [2] Codex"
-echo -e "  [3] Cursor"
-echo -e "  [4] GitHub Copilot"
-echo -e "  [5] Gemini CLI"
-echo -e "  [6] Windsurf"
-echo -e "  [7] OpenCode"
-echo -e "  [8] Antigravity"
-echo -n "  選択 (1-8, Enter=1): "
+echo "  Select your AI coding agent:"
+echo "  [1] Claude Code (default)"
+echo "  [2] Codex"
+echo "  [3] Cursor"
+echo "  [4] GitHub Copilot"
+echo "  [5] Gemini CLI"
+echo "  [6] Windsurf"
+echo "  [7] OpenCode"
+echo "  [8] Antigravity"
+echo -n "  Choice (1-8, Enter=1): "
 read -r AGENT_CHOICE
 
 case "${AGENT_CHOICE:-1}" in
@@ -109,10 +100,10 @@ case "${AGENT_CHOICE:-1}" in
 esac
 
 echo ""
-echo -e "  言語を選択:"
-echo -e "  [1] English（デフォルト）"
-echo -e "  [2] 日本語"
-echo -n "  選択 (1-2, Enter=1): "
+echo "  Select template language:"
+echo "  [1] English (default)"
+echo "  [2] Japanese"
+echo -n "  Choice (1-2, Enter=1): "
 read -r LANG_CHOICE
 
 case "${LANG_CHOICE:-1}" in
@@ -122,30 +113,27 @@ case "${LANG_CHOICE:-1}" in
 esac
 
 echo ""
-info "実行: npx github:$GITHUB_REPO $AGENT_FLAG $LANG_FLAG"
+info "Running: npx github:$GITHUB_REPO $AGENT_FLAG $LANG_FLAG"
 npx "github:$GITHUB_REPO" $AGENT_FLAG $LANG_FLAG
-ok "cc-sdd-graph のインストールが完了しました"
+ok "cc-sdd-graph installation complete"
 
-# ── Step 2: CRG セットアップ ──────────────────────────
-info "Step 2/4: code-review-graph をセットアップ中..."
+# ── Step 2: CRG Setup ──────────────────────────────────
+info "Step 2/4: Setting up code-review-graph..."
 
-# setup-crg.sh をダウンロード
 SETUP_CRG=".agents/scripts/setup-crg.sh"
 if [ -f "$SETUP_CRG" ]; then
-  info "setup-crg.sh が既に存在します"
+  info "setup-crg.sh already exists"
 else
   mkdir -p .agents/scripts
-  info "setup-crg.sh をダウンロード中..."
+  info "Downloading setup-crg.sh..."
   curl -sSL "$RAW_BASE/.agents/scripts/setup-crg.sh" -o "$SETUP_CRG"
   chmod +x "$SETUP_CRG"
-  ok "setup-crg.sh をダウンロードしました"
+  ok "setup-crg.sh downloaded"
 fi
 
-# CRG をインストール（自動モード）
 echo ""
-info "bash $SETUP_CRG --yes を実行します..."
+info "Running: bash $SETUP_CRG --yes"
 if [ -n "$AGENT_FLAG" ]; then
-  # エージェントフラグからプラットフォーム名を抽出
   case "$AGENT_FLAG" in
     *claude-code*)    CRG_PLATFORM="claude-code" ;;
     *codex*)          CRG_PLATFORM="codex" ;;
@@ -161,63 +149,57 @@ else
   bash "$SETUP_CRG" --yes
 fi
 
-ok "code-review-graph のセットアップが完了しました"
+ok "code-review-graph setup complete"
 
-# ── Step 3: .trace-mapping.yaml 初期化 ────────────────
-info "Step 3/4: .trace-mapping.yaml を確認中..."
+# ── Step 3: Initialize .trace-mapping.yaml ─────────────
+info "Step 3/4: Checking .trace-mapping.yaml..."
 
 if [ -f ".trace-mapping.yaml" ]; then
-  ok ".trace-mapping.yaml は既に存在します"
+  ok ".trace-mapping.yaml already exists"
 elif [ -f ".trace-mapping.example.yaml" ]; then
   cp ".trace-mapping.example.yaml" ".trace-mapping.yaml"
-  ok ".trace-mapping.example.yaml を .trace-mapping.yaml としてコピーしました"
+  ok "Created .trace-mapping.yaml from .trace-mapping.example.yaml"
 else
-  warn ".trace-mapping.yaml がありません。後で手動で作成してください。"
+  warn ".trace-mapping.yaml not found. Create one manually later."
 fi
 
-# ── Step 4: 初回スナップショット ─────────────────────
-info "Step 4/4: 初回スナップショットを保存中..."
+# ── Step 4: Initial Snapshot ───────────────────────────
+info "Step 4/4: Saving initial snapshot..."
 
 if [ -f ".agents/scripts/check_drift.py" ]; then
   $PYTHON .agents/scripts/check_drift.py --snapshot 2>/dev/null && \
-    ok "初回スナップショットを保存しました" || \
-    warn "スナップショット保存に失敗しました（コードがあれば後で実行）"
+    ok "Initial snapshot saved" || \
+    warn "Snapshot failed (rerun later when code exists)"
 else
-  warn "check_drift.py が見つかりません"
+  warn "check_drift.py not found"
 fi
 
-# ── 完了 ──────────────────────────────────────────────
+# ── Completion ─────────────────────────────────────────
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
-echo -e "${GREEN}  セットアップ完了！${NC}"
+echo -e "${GREEN}  Setup Complete!${NC}"
 echo -e "${GREEN}═══════════════════════════════════════${NC}"
 echo ""
-echo "  次のコマンドで使い始められます:"
+echo "  Get started with:"
 echo ""
 
 case "${AGENT_CHOICE:-1}" in
   2) PREFIX='$';;
-  3) PREFIX='/';;
-  4) PREFIX='/';;
-  5) PREFIX='/';;
-  6) PREFIX='@';;
-  7) PREFIX='/';;
-  8) PREFIX='/';;
   *) PREFIX='/';;
 esac
 
-echo "    ${PREFIX}kiro-discovery \"アイデア\""
+echo "    ${PREFIX}kiro-discovery \"your idea\""
 echo "    ${PREFIX}kiro-spec-init my-feature"
 echo "    ${PREFIX}kiro-spec-requirements my-feature"
 echo "    ${PREFIX}kiro-spec-design my-feature"
 echo "    ${PREFIX}kiro-spec-tasks my-feature"
 echo "    ${PREFIX}kiro-impl my-feature"
 echo ""
-echo "  CRG トレーサビリティ:"
+echo "  CRG Traceability:"
 echo "    ${PREFIX}kiro-trace 1.1"
 echo "    ${PREFIX}kiro-impact src/my-file.py"
 echo "    ${PREFIX}kiro-validate-boundary"
 echo ""
-echo "  コードグラフの再構築:"
+echo "  Rebuild code graph:"
 echo "    code-review-graph build"
 echo ""
