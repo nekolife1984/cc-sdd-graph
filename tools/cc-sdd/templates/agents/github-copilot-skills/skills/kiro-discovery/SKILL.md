@@ -55,6 +55,32 @@ Based on the user's request and the metadata from Step 1, determine which path a
 For Path C/D/E, present the determined path (or mixed decomposition) to the user and confirm before proceeding.
 For Path A/B, recommend the next action and stop.
 
+## Step 2.5: CRG Impact Assessment (for Path A/B)
+
+**Only when code-review-graph is available and Path A (existing spec extension) or Path B (direct fix) is identified.**
+
+Before proposing the approach, use CRG to assess the impact scope:
+
+1. **Run code-review-graph query** against the relevant components identified in Step 2:
+   - If Path A: query the existing spec's code symbols to check blast radius
+   - If Path B: query the related module/component to check dependencies
+
+2. **Report key findings** to the user alongside the path recommendation:
+   - Affected files and their callers/callees
+   - Number of tests that cover the affected area
+   - Any unexpectedly large impact radius that might change the path decision
+
+3. **If impact is unexpectedly large** (e.g., a "small fix" affects 20+ files), flag this as a consideration and suggest Path C/D as alternatives.
+
+Example output:
+```
+   📊 CRG Impact Assessment:
+     Files affected: 5 (2 direct, 3 transitive)
+     Tests covering this area: 12
+     ⚠️ The change also affects AdminController.bulk_delete
+     Consider: splitting this into a spec change (Path C) instead of direct fix (Path B)
+```
+
 ## Step 3: Deep Context Loading
 
 **Only for Path C, D, and E.** Now load the context needed for discovery.
