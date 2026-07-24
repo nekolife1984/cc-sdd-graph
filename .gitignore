@@ -90,4 +90,4 @@ docs/kiro/
 # AGENTS.md
 
 # Local dev tooling (not part of the project)
-.entire/
+.entire/.kiro/graph/
