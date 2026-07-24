@@ -41,6 +41,7 @@ Checks:
   12. stale      — .trace-mapping.yaml 参照ファイルの鮮度（90日ルール）
   P1 false-green ベクターチェック:
   13. cross-lang — 言語間の @impl タグ一貫性
+  14. snapshot   — コード変更後のスナップショット更新確認
 """
 
 import argparse
@@ -1038,6 +1039,93 @@ def check_cross_language_tags(project_dir: Path, mappings: list[dict]) -> list[s
     return issues
 
 
+def check_snapshot_freshness(project_dir: Path, mappings: list[dict]) -> list[str]:
+    """
+    P1-2: コード変更後にスナップショットが更新されているか
+    - .trace-snapshot.json が存在するか
+    - 直近のコード変更コミットでスナップショットも更新されているか
+    - pre-commit hook が設置されているか（任意）
+    """
+    issues = []
+
+    snapshot_path = project_dir / ".trace-snapshot.json"
+
+    # 1) スナップショットの存在確認
+    if not snapshot_path.exists():
+        issues.append(
+            "[snapshot] .trace-snapshot.json が見つかりません — "
+            "初回実行: python3 .agents/scripts/check_drift.py --snapshot"
+        )
+        return issues
+
+    # 2) git 管理下でなければここまで
+    try:
+        subprocess.run(["git", "rev-parse", "--git-dir"],
+                       capture_output=True, check=True, cwd=project_dir)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return issues
+
+    # 3) スナップショットの最終更新日を確認
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%ct", "--", str(snapshot_path)],
+            capture_output=True, text=True, check=True, cwd=project_dir,
+        )
+        if result.stdout.strip():
+            snap_ts = int(result.stdout.strip())
+            import time
+            snap_age_days = (time.time() - snap_ts) / 86400
+            if snap_age_days > 30:
+                issues.append(
+                    f"[snapshot] .trace-snapshot.json の最終更新から "
+                    f"{int(snap_age_days)} 日経過しています"
+                )
+    except (subprocess.CalledProcessError, ValueError):
+        pass
+
+    # 4) 直近のコード変更でスナップショットが一緒に更新されたか
+    try:
+        # コードファイルの変更コミット一覧（直近5件）
+        code_changes = subprocess.run(
+            ["git", "log", "-5", "--oneline", "--name-only",
+             "--diff-filter=M", "--", "*.py", "*.ts", "*.js", "*.go",
+             "*.rs", "*.java", "*.kt", "*.swift", "*.rb", "*.c", "*.cpp",
+             "*.cs"],
+            capture_output=True, text=True, cwd=project_dir,
+        ).stdout.strip().split("\n")
+
+        # スナップショットの更新コミット一覧
+        snap_changes = subprocess.run(
+            ["git", "log", "-5", "--oneline",
+             "--", str(snapshot_path)],
+            capture_output=True, text=True, cwd=project_dir,
+        ).stdout.strip().split("\n")
+
+        # コード変更があってスナップショット更新がない場合
+        if code_changes and code_changes != [""] and snap_changes == [""]:
+            # 各コード変更コミットからスナップショット更新を確認
+            for line in code_changes:
+                if line and not line.startswith(" "):
+                    commit_hash = line.split()[0] if line else ""
+                    if commit_hash:
+                        # このコミットにスナップショット更新が含まれるか
+                        has_snap = subprocess.run(
+                            ["git", "diff-tree", "--no-commit-id",
+                             "-r", "--name-only", commit_hash],
+                            capture_output=True, text=True, cwd=project_dir,
+                        ).stdout.strip()
+                        if ".trace-snapshot.json" not in has_snap:
+                            issues.append(
+                                f"[snapshot] コード変更コミット {commit_hash} に "
+                                f".trace-snapshot.json の更新が含まれていません"
+                            )
+                            break
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    return issues
+
+
 AVAILABLE_CHECKS = {
     "impl": check_impl_completeness,
     "files": check_files_existence,
@@ -1054,6 +1142,7 @@ AVAILABLE_CHECKS = {
     "stale": check_mapping_freshness,
     # P1 false-green ベクターチェック
     "cross-lang": check_cross_language_tags,
+    "snapshot": check_snapshot_freshness,
 }
 
 
