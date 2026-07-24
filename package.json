@@ -1,0 +1,12 @@
+{
+  "name": "cc-sdd-graph",
+  "version": "3.0.2",
+  "description": "Spec-driven SDLC with code-review-graph traceability",
+  "bin": {
+    "cc-sdd-graph": "./tools/cc-sdd/dist/cli.js"
+  },
+  "scripts": {
+    "postinstall": "cd tools/cc-sdd && npm install && npm run build"
+  },
+  "private": true
+}
